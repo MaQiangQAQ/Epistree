@@ -1,0 +1,27 @@
+name: 功能建议
+description: 提议新功能、数据源或演化分析方法
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      description: 请从用户或研究任务角度描述问题。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 请说明方案如何与 Epistree 的时序知识演化目标衔接。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      description: 什么结果可以证明该功能已正确实现？
+    validations:
+      required: true
+

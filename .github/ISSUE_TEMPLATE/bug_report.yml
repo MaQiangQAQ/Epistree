@@ -1,0 +1,30 @@
+name: 缺陷报告
+description: 报告可重现的错误或不符合预期的行为
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 请说明实际行为与预期行为。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 请提供最小可复现过程。
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 请提供版本、操作系统、数据来源和其他必要信息。
+  - type: textarea
+    id: provenance
+    attributes:
+      label: 来源与证据
+      description: 如问题涉及节点或演化关系，请附原始来源和时间信息。
+
