@@ -6,7 +6,13 @@
 
 ### Added
 
-- 暂无。后续功能、文档和工程化变更应在合并时立即记录于此。
+- 新增《Epistree 初步工程设计》，完成模块边界、统一契约、数据模型、存储、工作流与可视化的分阶段方案。
+- 增加知乎 API 日配额治理与 L0–L3 多层缓存设计，支持查询去重、跨日积累、单航班和派生结果复用。
+- 记录 GraphRAG、Graphiti、Prefect、Dagster、PostgreSQL/pgvector、Neo4j、Valkey、Cytoscape.js 等参考实现的比较与取舍。
+
+### Changed
+
+- 明确 MVP 以知乎开放数据为默认数据边界，不默认接入外部新闻、论文或其他社区。
 
 ## [0.1.0] - 2026-09-08
 
@@ -22,4 +28,3 @@
 
 [Unreleased]: https://github.com/MaQiangQAQ/Epistree/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/MaQiangQAQ/Epistree/releases/tag/v0.1.0
-
