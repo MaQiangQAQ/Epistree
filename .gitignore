@@ -1,0 +1,4 @@
+.zhihu-cli/
+.env
+.env.*
+!.env.example
