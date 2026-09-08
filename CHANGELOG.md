@@ -9,6 +9,8 @@
 - 新增《Epistree 初步工程设计》，完成模块边界、统一契约、数据模型、存储、工作流与可视化的分阶段方案。
 - 增加知乎 API 日配额治理与 L0–L3 多层缓存设计，支持查询去重、跨日积累、单航班和派生结果复用。
 - 记录 GraphRAG、Graphiti、Prefect、Dagster、PostgreSQL/pgvector、Neo4j、Valkey、Cytoscape.js 等参考实现的比较与取舍。
+- 新增《Epistree 可行 Demo 完整设计》，将完整蓝图收敛为 Dash、Dash Cytoscape、requests-cache、SQLite 和 Instructor 组成的单实例实施方案。
+- 补充 Demo 的数据契约、持久化表、配额硬上限、错误降级、测试矩阵、六步实施顺序与完成定义。
 
 ### Changed
 

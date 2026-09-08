@@ -78,6 +78,7 @@ MVP 默认不接入外部新闻、论文或其他社区，也不承诺完整的�
 ├── ROADMAP.md                 # 分阶段实施路线
 ├── CONTRIBUTING.md            # 开发与版本约定
 ├── docs/ENGINEERING_DESIGN.md # 可分阶段实施的工程设计
+├── docs/DEMO_DESIGN.md        # 单实例可行 Demo 完整设计
 ├── 知识世界树_系统构想.md   # 完整产品与系统设计
 └── .agents/skills/zhihu/      # 项目内知乎工具说明
 ```
@@ -97,4 +98,4 @@ MVP 默认不接入外部新闻、论文或其他社区，也不承诺完整的�
 
 ## 设计文档
 
-产品长期构想见 [《知识世界树：系统构想》](知识世界树_系统构想.md)。当前的模块边界、统一契约、知乎配额与缓存策略、技术选型对比、分阶段验收条件和风险升级规则见 [《Epistree 初步工程设计》](docs/ENGINEERING_DESIGN.md)。两者冲突时，实施以工程设计中已确认的边界为准。
+产品长期构想见 [《知识世界树：系统构想》](知识世界树_系统构想.md)。完整工程的模块边界、统一契约、知乎配额与缓存策略、技术选型对比和分阶段验收见 [《Epistree 初步工程设计》](docs/ENGINEERING_DESIGN.md)。当前可直接实施的单实例、单数据库 Demo 见 [《Epistree 可行 Demo 完整设计》](docs/DEMO_DESIGN.md)。Demo 实现以后者为准。
