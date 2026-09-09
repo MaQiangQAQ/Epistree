@@ -1,0 +1,55 @@
+{
+  "_meta": {
+    "description": "Fixture for Epistree Demo zhihu_client tests.",
+    "acquired_at": "2026-09-08",
+    "schema_purpose": "Mock Zhihu search API for offline tests via responses",
+    "notes": "Field names match the real Zhihu API (PascalCase). Data truncated for test size."
+  },
+  "Code": 0,
+  "Message": "success",
+  "Data": {
+    "HasMore": false,
+    "SearchHashId": "mock_hash_rag_001",
+    "Items": [
+      {
+        "Title": "RAG系统中知识图谱还是向量数据库? - 知乎",
+        "ContentType": "Answer",
+        "ContentID": "-4522481628176134219",
+        "ContentText": "RAG通过将外部知识库与语言模型结合，提升回答的准确性和时效性。Agentic RAG和DCI等新范式强化LLM的利用率。",
+        "Url": "https://www.zhihu.com/question/2545722213/answer/2058591897283737196",
+        "AuthorName": "欧德张3000",
+        "EditTime": 1785295210,
+        "VoteUpCount": 184,
+        "CommentCount": 28,
+        "AuthorityLevel": "4",
+        "RankingScore": 1.7146591
+      },
+      {
+        "Title": "如何在不微调的情况下提高RAG的准确性? - 知乎",
+        "ContentType": "Answer",
+        "ContentID": "8423067469552355783",
+        "ContentText": "基于人工的RAG评测需要人工构建问题和对应目标文本的数据集。通常选择recall, precision, f1_score, hit_rate等指标。",
+        "Url": "https://www.zhihu.com/question/638730143/answer/35565847625",
+        "AuthorName": "JarsonCai",
+        "EditTime": 1784973570,
+        "VoteUpCount": 1012,
+        "CommentCount": 34,
+        "AuthorityLevel": "4",
+        "RankingScore": 1.7066902
+      },
+      {
+        "Title": "非向量RAG:PageIndex看目录找答案 - 知乎",
+        "ContentType": "Article",
+        "ContentID": "5737808419566936700",
+        "ContentText": "传统Vector RAG把文档切成固定chunks再做embedding search。PageIndex不先切分，而是恢复文档的章节结构，让LLM像人一样查看目录判断答案所在。",
+        "Url": "https://zhuanlan.zhihu.com/p/2072749541879706913",
+        "AuthorName": "狗带妖怪",
+        "EditTime": 1786962563,
+        "VoteUpCount": 0,
+        "CommentCount": 0,
+        "AuthorityLevel": "4",
+        "RankingScore": 1.702202
+      }
+    ]
+  }
+}
