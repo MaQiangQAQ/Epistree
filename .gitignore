@@ -8,4 +8,5 @@
 *.sqlite-shm
 __pycache__/
 *.pyc
+*.egg-info/
 .data/
