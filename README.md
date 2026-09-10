@@ -6,9 +6,35 @@ Epistree 是一个以知乎开放数据为核心的时序知识发现与演化�
 
 ## 项目状态
 
-**v0.1.0 · 系统构想与 MVP 规划阶段**
+**v0.2.0 · 可离线演示的最小闭环**
 
-当前仓库已完成产品定位、核心数据对象、演化关系、总体架构和分阶段实施路线的设计。数据管线、演化引擎和可视化应用尚未实现。
+当前仓库包含可启动的 Dash Demo：预热主题可在无凭据、断网条件下浏览；自定义搜索使用知乎开放接口、SQLite 日预算和 requests-cache，并把模型候选严格回链到本次来源。关系是 `model_candidate`，不代表自动事实判定。
+
+### 当前 Demo 能做什么
+
+- 点击 `RAG`、`大模型微调`、`视觉大模型` 三个预热主题，零真实调用加载已保存的知乎来源和世界树。
+- 用“纵向时间、横向分叉”的确定性布局查看 Topic、Question、Claim、Event 和 Source；节点大小表示证据数，透明度表示置信度。
+- 点击节点聚焦上下游关系，在右栏核对摘要、作者、时间和知乎原文；按 `Esc` 退出聚焦。
+- 按年份筛选、拖动时间滑块或播放生长过程，并将当前完整图谱导出为 JSON。
+- 输入自定义主题后先编辑查询，再在官方剩余额度和本地日预算共同约束下执行知乎搜索与一次结构化抽取。
+
+预热图谱是可复现的演示快照，不等同于实时知乎结果；所有自动生成关系都以候选关系展示。
+
+## 本地启动
+
+```bash
+uv sync --frozen
+uv run epistree-demo
+```
+
+浏览器打开 `http://localhost:8050`。预热资产从 `DATA_DIR`（默认 `.data`）读取，点击主题不会调用知乎或模型；该目录属于部署数据，Git 不跟踪，换机或部署时需要单独挂载 `warmup_*.json`。缺少预热资产时首页仍可启动，对应按钮不会伪造结果。自定义搜索前请通过环境变量配置 `ZHIHU_ACCESS_SECRET` 与 `LLM_API_KEY`；程序不会自动读取仓库 `.env`。本地可先填写 `.env`，再执行 `set -a; source .env; set +a` 将变量仅注入当前终端会话。
+
+Docker 启动：
+
+```bash
+docker build -t epistree-demo .
+docker run --rm -p 8050:8050 -v "$PWD/.data:/data" epistree-demo
+```
 
 ## 核心问题
 
@@ -79,6 +105,10 @@ MVP 默认不接入外部新闻、论文或其他社区，也不承诺完整的�
 ├── CONTRIBUTING.md            # 开发与版本约定
 ├── docs/ENGINEERING_DESIGN.md # 可分阶段实施的工程设计
 ├── docs/DEMO_DESIGN.md        # 单实例可行 Demo 完整设计
+├── docs/DEMO_REMEDIATION_PLAN.md # 当前 Demo 修改实施方案
+├── docs/EPISTREE_FRONTEND_DESIGN.md # 已落地的前端视觉与交互设计
+├── src/epistree_demo/          # Dash 应用、数据契约与服务实现
+├── tests/                      # 离线单元与回归测试
 ├── 知识世界树_系统构想.md   # 完整产品与系统设计
 └── .agents/skills/zhihu/      # 项目内知乎工具说明
 ```
@@ -98,4 +128,4 @@ MVP 默认不接入外部新闻、论文或其他社区，也不承诺完整的�
 
 ## 设计文档
 
-产品长期构想见 [《知识世界树：系统构想》](知识世界树_系统构想.md)。完整工程的模块边界、统一契约、知乎配额与缓存策略、技术选型对比和分阶段验收见 [《Epistree 初步工程设计》](docs/ENGINEERING_DESIGN.md)。当前可直接实施的单实例、单数据库 Demo 见 [《Epistree 可行 Demo 完整设计》](docs/DEMO_DESIGN.md)。Demo 实现以后者为准。
+产品长期构想见 [《知识世界树：系统构想》](知识世界树_系统构想.md)。完整工程的模块边界、统一契约、知乎配额与缓存策略、技术选型对比和分阶段验收见 [《Epistree 初步工程设计》](docs/ENGINEERING_DESIGN.md)。单实例、单数据库 Demo 的目标设计见 [《Epistree 可行 Demo 完整设计》](docs/DEMO_DESIGN.md)；已执行的修复与验收边界见 [《Epistree Demo 修改实施方案》](docs/DEMO_REMEDIATION_PLAN.md)；当前界面的视觉语义、布局和交互依据见 [《Epistree 前端设计方案》](docs/EPISTREE_FRONTEND_DESIGN.md)。

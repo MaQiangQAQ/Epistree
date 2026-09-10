@@ -62,16 +62,10 @@ class TestGraphBundle:
         assert bundle.topic == "Test"
 
     def test_claim_with_missing_question(self):
-        """Validator auto-fixes missing questions by creating a default one."""
-        bundle = GraphBundle(
-            topic="Test",
-            questions=[],
-            claims=[make_claim(question_id="nonexistent")],
-            events=[],
-        )
-        # Auto-fix creates a question node
-        assert len(bundle.questions) == 1
-        assert bundle.questions[0].id == "nonexistent"
+        """Unknown question references are rejected, never synthesized."""
+        import pytest
+        with pytest.raises(ValueError, match="question_id"):
+            GraphBundle(topic="Test", questions=[], claims=[make_claim(question_id="nonexistent")], events=[])
 
     def test_claim_without_source_refs(self):
         import pytest
@@ -139,17 +133,14 @@ class TestFlatToGraphBundle:
         assert bundle.claims[0].question_id == "q1"
 
     def test_auto_question_generation(self):
-        flat = FlatGraphBundle(
-            topic="Test",
-            nodes=[
-                FlatNode(id="c1", type="claim", text="C1",
-                         source_ids=["zhihu:answer:1"], confidence=0.8),
-            ],
-            relations=[],
-        )
-        bundle = flat_to_graph_bundle(flat)
-        assert len(bundle.questions) == 1  # auto-generated
-        assert bundle.questions[0].text.startswith("关于")
+        import pytest
+        with pytest.raises(ValueError, match="question_id"):
+            FlatGraphBundle(
+                topic="Test",
+                nodes=[FlatNode(id="c1", type="claim", text="C1",
+                                source_ids=["zhihu:answer:1"], confidence=0.8)],
+                relations=[],
+            )
 
     def test_flat_relation_to_canonical(self):
         flat = FlatGraphBundle(

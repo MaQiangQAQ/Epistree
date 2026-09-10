@@ -6,6 +6,7 @@ Matches section 5.3–5.4 of DEMO_DESIGN.md.
 from __future__ import annotations
 
 import hashlib
+import json
 from collections import OrderedDict
 
 from .models import SearchItem
@@ -56,15 +57,20 @@ def compute_input_hash(
     graph_schema_version: str,
     model_name: str,
 ) -> str:
-    """Compute the extraction cache key — sha256 of sorted inputs + metadata."""
-    sorted_sources = sorted(
-        sources, key=lambda s: f"{s.source_id}:{s.content_id}"
-    )
-    parts = "|".join(
-        f"{s.source_id}:{s.content_id}:{s.content_text[:1500]}"
-        for s in sorted_sources
-    )
-    raw = f"{parts}|{topic}|{prompt_version}|{graph_schema_version}|{model_name}"
+    """Hash the exact normalized model input, including all model-visible fields."""
+    source_inputs = []
+    for s in sorted(sources, key=lambda item: item.source_id):
+        source_inputs.append({
+            "source_id": s.source_id, "title": s.title, "author_name": s.author_name,
+            "edit_time": s.edit_time.isoformat() if s.edit_time else None,
+            "content_text": s.content_text[:1500],
+            "truncated_for_model": len(s.content_text) > 1500,
+        })
+    raw = json.dumps({
+        "topic": topic, "sources": source_inputs, "prompt_version": prompt_version,
+        "graph_schema_version": graph_schema_version, "model_name": model_name,
+        "input_truncation_version": "first-1500-v1",
+    }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 

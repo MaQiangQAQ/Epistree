@@ -10,8 +10,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
+        # Deliberately do not auto-read a repository .env. Demo deployments
+        # inject only the variables they intend to expose to this process.
+        env_file=None,
         extra="ignore",
     )
 

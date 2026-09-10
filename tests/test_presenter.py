@@ -88,6 +88,7 @@ class TestPresenter:
         )
         sources = [make_source("zhihu:answer:1"), make_source("zhihu:answer:2")]
         _nodes, edges = present(bundle, sources)
-        dashed_edges = [e for e in edges if e["classes"] == "dashed"]
+        dashed_edges = [e for e in edges if "dashed" in e["classes"].split()]
         assert len(dashed_edges) == 1
         assert dashed_edges[0]["data"]["edge_type"] == "contradicts"
+        assert "rel-contradicts" in dashed_edges[0]["classes"].split()

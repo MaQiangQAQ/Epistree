@@ -9,21 +9,15 @@ Two layers:
 
 from __future__ import annotations
 
-import hashlib
-import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Mapping
 
 from pydantic import BaseModel, Field, HttpUrl, model_validator
-
 
 # ── helper ────────────────────────────────────────────────────────────────
 
 def _generate_source_id(content_type: str, content_id: str) -> str:
     return f"zhihu:{content_type}:{content_id}"
-
-def _make_id() -> str:
-    return str(uuid.uuid4())[:8]
 
 
 # ── 6.1 知乎搜索对象 ──────────────────────────────────────────────────────
@@ -53,7 +47,7 @@ class SearchResponse(BaseModel):
     """Wrapper around the raw zhihu_search API response."""
 
     code: int
-    data: list[SearchItem] = []
+    data: list[SearchItem] = Field(default_factory=list)
     search_hash_id: str | None = None
     raw_json: dict | None = None
 
@@ -121,8 +115,6 @@ class FlatGraphBundle(BaseModel):
             node_ids.add(n.id)
             if n.type == "claim":
                 claim_ids.add(n.id)
-                if n.question_id and n.question_id not in node_ids:
-                    errors.append(f"Claim {n.id}: question_id {n.question_id!r} not found in nodes")
             if n.type == "question" and n.question_id:
                 errors.append(f"Question {n.id} should not have question_id")
 
@@ -131,9 +123,15 @@ class FlatGraphBundle(BaseModel):
                 errors.append(f"Relation {r.id}: source_node_id {r.source_node_id!r} is not a Claim")
             if r.target_node_id not in claim_ids:
                 errors.append(f"Relation {r.id}: target_node_id {r.target_node_id!r} is not a Claim")
-            if r.id in [x.id for x in self.relations if x.id == r.id]:
-                # self-check uniqueness — count occurrences
-                pass
+        relation_ids = [r.id for r in self.relations]
+        errors.extend(
+            f"Duplicate relation id: {rid}" for rid in set(relation_ids)
+            if relation_ids.count(rid) > 1
+        )
+        question_ids = {n.id for n in self.nodes if n.type == "question"}
+        for n in self.nodes:
+            if n.type == "claim" and (not n.question_id or n.question_id not in question_ids):
+                errors.append(f"Claim {n.id}: question_id {n.question_id!r} not found in nodes")
 
         if errors:
             raise ValueError("FlatGraphBundle validation failed:\n" + "\n".join(errors))
@@ -147,21 +145,15 @@ def flat_to_graph_bundle(flat: FlatGraphBundle) -> "GraphBundle":
     guaranteed valid.  GraphBundle model_validator also runs on the result
     as a defence-in-depth check.
     """
-    node_map = {n.id: n for n in flat.nodes}
-
     questions: list[QuestionNode] = []
     claims: list[ClaimNode] = []
     events: list[EventNode] = []
-    auto_question_id = f"auto_q_{_make_id()}"
-    seen_question_ids: set[str] = {q.id for q in flat.nodes if q.type == "question"}
-
     for n in flat.nodes:
         refs = [SourceRef(source_id=sid) for sid in n.source_ids]
         if n.type == "question":
             questions.append(QuestionNode(id=n.id, text=n.text, source_refs=refs))
         elif n.type == "claim":
-            # Map unknown question IDs to auto question
-            qid = n.question_id if (n.question_id and n.question_id in seen_question_ids) else auto_question_id
+            qid = n.question_id
             claims.append(ClaimNode(
                 id=n.id, text=n.text, question_id=qid,
                 source_refs=refs, confidence=n.confidence or 0.5,
@@ -171,15 +163,6 @@ def flat_to_graph_bundle(flat: FlatGraphBundle) -> "GraphBundle":
                 id=n.id, text=n.text, occurred_at=n.occurred_at,
                 source_refs=refs, confidence=n.confidence or 0.5,
             ))
-
-    # Auto-create default question ONLY if no real question nodes exist
-    has_real_question = any(n.type == "question" for n in flat.nodes)
-    if not has_real_question and auto_question_id not in {q.id for q in questions}:
-        questions.insert(0, QuestionNode(
-            id=auto_question_id,
-            text=f"关于「{flat.topic}」的讨论",
-            source_refs=[SourceRef(source_id=s.source_ids[0]) for s in flat.nodes if s.source_ids][:1] if flat.nodes else [],
-        ))
 
     # Enforce claim limit during conversion
     MAX_CLAIMS = 12
@@ -264,8 +247,6 @@ class GraphBundle(BaseModel):
         all_source_ids: set[str] = set()
         claim_ids: set[str] = {c.id for c in self.claims}
         question_ids: set[str] = {q.id for q in self.questions}
-        event_ids: set[str] = {e.id for e in self.events}
-        relation_ids: set[str] = {r.id for r in self.relations}
 
         # Collect source refs
         for q in self.questions:
@@ -280,20 +261,6 @@ class GraphBundle(BaseModel):
         for r in self.relations:
             for sr in r.source_refs:
                 all_source_ids.add(sr.source_id)
-
-        # Auto-fix: create missing questions for claim references
-        missing_qids = {c.question_id for c in self.claims
-                        if c.question_id and c.question_id not in question_ids}
-        if missing_qids:
-            for qid in missing_qids:
-                first_claim = next((c for c in self.claims if c.question_id == qid), None)
-                first_source = first_claim.source_refs[0] if first_claim and first_claim.source_refs else None
-                self.questions.append(QuestionNode(
-                    id=qid,
-                    text=f"关于「{self.topic}」的讨论",
-                    source_refs=[first_source] if first_source else [],
-                ))
-            question_ids.update(missing_qids)
 
         # Claim.question_id must exist
         for c in self.claims:
@@ -338,3 +305,41 @@ def validate_quote(ref: SourceRef, content_text: str) -> SourceRef:
     if ref.quote and ref.quote not in content_text:
         return SourceRef(source_id=ref.source_id, quote=None)
     return ref
+
+
+def validate_bundle_against_sources(
+    bundle: GraphBundle, source_map: Mapping[str, SearchItem]
+) -> GraphBundle:
+    """Validate graph provenance against the exact sources supplied to the model.
+
+    Pydantic validates shape; this domain check prevents fabricated source IDs,
+    orphan questions and relations from entering storage or the UI.
+    """
+    errors: list[str] = []
+    node_ids = [n.id for n in [*bundle.questions, *bundle.claims, *bundle.events]]
+    relation_ids = [r.id for r in bundle.relations]
+    if len(node_ids) != len(set(node_ids)):
+        errors.append("Duplicate node id")
+    if len(relation_ids) != len(set(relation_ids)):
+        errors.append("Duplicate relation id")
+    question_ids = {q.id for q in bundle.questions}
+    claim_ids = {c.id for c in bundle.claims}
+    for claim in bundle.claims:
+        if claim.question_id not in question_ids:
+            errors.append(f"Claim {claim.id}: unknown question_id {claim.question_id!r}")
+    for obj in [*bundle.questions, *bundle.claims, *bundle.events, *bundle.relations]:
+        for ref in obj.source_refs:
+            source = source_map.get(ref.source_id)
+            if source is None:
+                errors.append(f"{getattr(obj, 'id', 'relation')}: unknown source_id {ref.source_id!r}")
+            elif ref.quote and ref.quote not in source.content_text:
+                # Keep the source reference but make unsupported quotes explicit.
+                ref.quote = None
+    for relation in bundle.relations:
+        if relation.source_node_id not in claim_ids:
+            errors.append(f"Relation {relation.id}: source endpoint is not a Claim")
+        if relation.target_node_id not in claim_ids:
+            errors.append(f"Relation {relation.id}: target endpoint is not a Claim")
+    if errors:
+        raise ValueError("MODEL_VALIDATION_FAILED: " + "; ".join(errors))
+    return bundle
