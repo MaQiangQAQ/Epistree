@@ -28,8 +28,8 @@ app = dash.Dash(
     suppress_callback_exceptions=True,
     background_callback_manager=DiskcacheManager(),
     external_stylesheets=[
-        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700"
-        "&family=JetBrains+Mono:wght@400;600&display=swap",
+        "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800"
+        "&family=IBM+Plex+Mono:wght@400;500;600&display=swap",
     ],
     external_scripts=[
         # tsParticles（particles.js 已停更，调研结论 §2.3）；CDN 不可用时静默降级
@@ -162,7 +162,8 @@ CYTO_STYLESHEET: list[dict] = [
         "color": "#1a1207", "textOutlineWidth": 0, "fontWeight": "bold",
         "fontSize": "13px", "textValign": "center", "textMarginY": 0,
         "textMaxWidth": "76px",
-        "underlayColor": "#ffd54f", "underlayOpacity": 0.18, "underlayPadding": 14,
+        # Cytoscape underlay is rectangular; the seed SVG already contains a round halo.
+        "underlayOpacity": 0,
     }},
     # Question：蓝色六瓣花（主枝锚点，标签常驻）
     {"selector": ".question", "style": {
@@ -227,7 +228,7 @@ CYTO_STYLESHEET: list[dict] = [
     # 标签按需显现：选中节点（金环）或生长/事件高光时
     {"selector": "node:selected", "style": {
         "content": "data(label)", "fontSize": "12px", "fontWeight": 600,
-        "underlayColor": "#ffd54f", "underlayOpacity": 0.32, "underlayPadding": 14,
+        "underlayOpacity": 0, "borderWidth": 2, "borderColor": "#ffd54f",
     }},
     # 边基础：有机树枝 = unbundled-bezier 弯边，圆头，无箭头，粗细按 data(w)
     {"selector": "edge", "style": {
@@ -284,7 +285,7 @@ CYTO_STYLESHEET: list[dict] = [
     {"selector": ".faded", "style": {"opacity": 0.12, "underlayOpacity": 0}},
     {"selector": "edge.faded", "style": {"opacity": 0.06}},
     {"selector": ".highlighted", "style": {
-        "underlayOpacity": 0.4, "underlayPadding": 14,
+        "underlayOpacity": 0, "borderWidth": 2, "borderColor": "#65f6b5",
         "content": "data(label)", "fontSize": "12px", "fontWeight": 600,
     }},
     {"selector": "edge.highlighted", "style": {
@@ -324,37 +325,53 @@ app.layout = html.Div(
     children=[
         # 氛围层
         html.Div(className="bg-glow"),
+        html.Div(className="bg-grid"),
+        html.Div(className="scanline"),
         html.Div(id="particles-bg"),
 
         # ── 顶栏 ──────────────────────────────────────────────────────
-        html.Header(className="topbar glass-panel", children=[
+        html.Header(className="topbar", children=[
             html.Div(className="brand", children=[
-                html.Span("Ep", className="brand-logo"),
+                html.Span(className="brand-logo", children=[
+                    html.Span(className="brand-orbit"),
+                    html.Span("E", className="brand-glyph"),
+                ]),
                 html.Div([
-                    html.Div("Epistree", className="brand-name"),
-                    html.Div("知识世界树 Demo", className="brand-sub"),
+                    html.Div([
+                        html.Span("EPISTREE", className="brand-name"),
+                        html.Span("LIVE", className="live-chip"),
+                    ], className="brand-line"),
+                    html.Div("ZHIHU KNOWLEDGE EVOLUTION ENGINE", className="brand-sub"),
                 ]),
             ]),
             html.Div(className="topbar-controls", children=[
-                dcc.Input(
-                    id="topic-input",
-                    type="text",
-                    placeholder="输入主题（如：大模型微调）",
-                    maxLength=50,
-                ),
-                html.Button("生成查询", id="btn-build-queries", className="btn btn-secondary"),
-                html.Button("生成世界树", id="btn-generate", className="btn btn-primary", disabled=True),
-                html.Button("取消", id="btn-cancel", className="btn btn-secondary"),
-                html.Button("导出 JSON", id="btn-export", className="btn btn-secondary"),
+                html.Div(className="command-input", children=[
+                    html.Span("⌕", className="command-icon"),
+                    dcc.Input(
+                        id="topic-input",
+                        type="text",
+                        placeholder="探索一个知识主题…",
+                        maxLength=50,
+                    ),
+                    html.Span("↵", className="key-hint"),
+                ]),
+                html.Div(className="command-actions", children=[
+                    html.Button("构建查询", id="btn-build-queries", className="btn btn-secondary"),
+                    html.Button([html.Span(className="btn-spark"), "生成世界树"],
+                                id="btn-generate", className="btn btn-primary", disabled=True),
+                    html.Button("停止", id="btn-cancel", className="btn btn-ghost"),
+                    html.Button("导出", id="btn-export", className="btn btn-ghost"),
+                ]),
             ]),
             html.Div(id="quota-info", className="quota-info"),
         ]),
 
         # 预热主题
         html.Div(className="warmup-row", children=[
-            html.Span("预热主题", className="warmup-label"),
+            html.Span("QUICK ACCESS", className="warmup-label"),
             *[html.Button(t, id=f"warmup-{i}", className="btn warmup-btn")
               for i, t in enumerate(WARMUP_TOPICS)],
+            html.Span("选择预载知识域 · 0 API CALL", className="warmup-note"),
         ]),
 
         # 进度线
@@ -368,7 +385,7 @@ app.layout = html.Div(
             # 左栏：图例 + 年轮时间带
             html.Aside(className="sidebar-left", children=[
                 html.Div(className="glass-panel legend-panel", children=[
-                    html.Div("图例", className="panel-title"),
+                    html.Div([html.Span("01"), "知识语法"], className="panel-title"),
                     html.Div(className="legend-item", children=[
                         _legend_swatch("var(--c-topic)"),
                         html.Div([html.Div("Topic 主题", className="legend-name"),
@@ -415,7 +432,7 @@ app.layout = html.Div(
                              className="legend-note"),
                 ]),
                 html.Div(className="glass-panel timeband-panel", children=[
-                    html.Div("年轮 · 时间带", className="panel-title"),
+                    html.Div([html.Span("02"), "时间信号"], className="panel-title"),
                     html.Div(id="time-band",
                              children=[html.Div("生成世界树后按年份点亮",
                                                 className="legend-desc")]),
@@ -424,6 +441,15 @@ app.layout = html.Div(
 
             # 中央画布
             html.Main(className="canvas-wrap", children=[
+                html.Div(className="canvas-hud", children=[
+                    html.Div("KNOWLEDGE TOPOLOGY", className="hud-kicker"),
+                    html.Div("知识演化场", className="hud-title"),
+                    html.Div("时间向上生长 · 观点横向分化", className="hud-sub"),
+                ]),
+                html.Div(className="canvas-status", children=[
+                    html.Span(className="status-dot"),
+                    html.Span("INTERACTIVE CANVAS"),
+                ]),
                 cyto.Cytoscape(
                     id="cytoscape-graph",
                     className="cytoscape-container",
@@ -440,12 +466,17 @@ app.layout = html.Div(
                     stylesheet=CYTO_STYLESHEET,
                 ),
                 html.Div(id="year-axis", className="year-axis"),
+                html.Div(className="canvas-hints", children=[
+                    html.Span("SCROLL / ZOOM"),
+                    html.Span("DRAG / NAVIGATE"),
+                    html.Span("CLICK / INSPECT"),
+                ]),
             ]),
 
             # 右栏：详情 + 来源
             html.Aside(className="sidebar-right", children=[
                 html.Div(className="glass-panel detail-panel", children=[
-                    html.Div("节点详情", className="panel-title"),
+                    html.Div([html.Span("03"), "节点情报"], className="panel-title"),
                     html.Div(id="node-detail", className="node-detail",
                              children="点击节点查看详情"),
                 ]),
@@ -457,7 +488,11 @@ app.layout = html.Div(
 
         # ── 底栏：时间回放 + 时间筛选 ─────────────────────────────────
         html.Footer(className="bottombar glass-panel", children=[
-            html.Button("▶ 回放生长", id="btn-play", className="btn btn-primary play-btn",
+            html.Div(className="timeline-identity", children=[
+                html.Span("EVOLUTION", className="timeline-kicker"),
+                html.Span("知识生长回放", className="timeline-title"),
+            ]),
+            html.Button("▶", id="btn-play", className="btn btn-primary play-btn",
                         style={"width": "auto", "padding": "0 14px"}),
             dcc.Slider(
                 id="time-slider",
@@ -466,7 +501,7 @@ app.layout = html.Div(
                 className="time-slider",
                 tooltip={"placement": "bottom", "always_visible": False},
             ),
-            html.Span("时间筛选", className="control-label"),
+            html.Span("TIME RANGE", className="control-label"),
             dcc.Dropdown(
                 id="time-filter", options=[
                     {"label": "全部时间", "value": "all"},
@@ -1152,7 +1187,7 @@ def _playback(_play, _tick, slider_value, state, elements, years):
 
 @callback(Output("btn-play", "children"), Input("playback-state", "data"))
 def _play_label(state):
-    return "⏸ 暂停" if (state or {}).get("playing") else "▶ 回放生长"
+    return "Ⅱ" if (state or {}).get("playing") else "▶"
 
 
 # ── 聚焦交互：点击节点高亮邻居、其余淡出（Kumu Focus / WikiGalaxy 光束）──
