@@ -100,8 +100,8 @@ class FlatGraphBundle(BaseModel):
     """
 
     topic: str
-    nodes: list[FlatNode] = Field(default_factory=list, max_length=22)      # 5Q + 12C + 5E
-    relations: list[FlatRelation] = Field(default_factory=list, max_length=15)
+    nodes: list[FlatNode] = Field(default_factory=list, max_length=400)      # Up to 30Q + 150C + 40E + 180S
+    relations: list[FlatRelation] = Field(default_factory=list, max_length=250)
 
     @model_validator(mode="after")
     def _validate_flat(self) -> "FlatGraphBundle":
@@ -165,7 +165,7 @@ def flat_to_graph_bundle(flat: FlatGraphBundle) -> "GraphBundle":
             ))
 
     # Enforce claim limit during conversion
-    MAX_CLAIMS = 12
+    MAX_CLAIMS = 150
     claims = claims[:MAX_CLAIMS]
     claim_ids_in_bundle = {c.id for c in claims}
 
@@ -233,10 +233,10 @@ class GraphBundle(BaseModel):
     """Top-level output from the knowledge extractor."""
 
     topic: str
-    questions: list[QuestionNode] = Field(default_factory=list, max_length=5)
-    claims: list[ClaimNode] = Field(default_factory=list, max_length=12)
-    events: list[EventNode] = Field(default_factory=list, max_length=5)
-    relations: list[CandidateRelation] = Field(default_factory=list, max_length=15)
+    questions: list[QuestionNode] = Field(default_factory=list, max_length=40)
+    claims: list[ClaimNode] = Field(default_factory=list, max_length=150)
+    events: list[EventNode] = Field(default_factory=list, max_length=50)
+    relations: list[CandidateRelation] = Field(default_factory=list, max_length=250)
 
     # ── 6.3 跨对象校验 ──────────────────────────────────────────────────
 

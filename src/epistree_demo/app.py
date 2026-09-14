@@ -39,8 +39,29 @@ app = dash.Dash(
 
 server = app.server
 
-# Warmup topics — loaded from DATA_DIR
-WARMUP_TOPICS = get_warmup_topics_list()
+# Warmup topics — loaded from DATA_DIR with curated exhibition order
+ORDERED_TOPICS = [
+    "RAG",
+    "大模型微调",
+    "视觉大模型",
+    "AI Agent 智能体",
+    "大模型推理加速与量化",
+    "大模型强化学习与长思维链",
+]
+_available_topics = get_warmup_topics_list()
+WARMUP_TOPICS = [t for t in ORDERED_TOPICS if t in _available_topics] + [
+    t for t in _available_topics if t not in ORDERED_TOPICS
+]
+
+TOPIC_ICONS = {
+    "RAG": "🌿",
+    "大模型微调": "🧬",
+    "视觉大模型": "👁️",
+    "AI Agent 智能体": "🤖",
+    "大模型推理加速与量化": "⚡",
+    "大模型强化学习与长思维链": "🧠",
+}
+
 
 # ── 世界树视觉语法 stylesheet（设计文档 §5.2 / §5.3）────────────────────
 # 植物隐喻（ContactTrees 的 leaves & fruits 手法 + OneZoom 木质锥形枝干）：
@@ -134,9 +155,9 @@ _IMG = {
 }
 
 CYTO_STYLESHEET: list[dict] = [
-    # 节点基础：单行标签 + 深底可读性描边；方位由 lab-* class 决定（退火放置）
+    # 节点基础：默认无常驻文字；仅关键主枝与选中节点显现文字，保证树木繁茂通透
     {"selector": "node", "style": {
-        "content": "data(label)", "fontSize": "12px", "color": "#e8eaf0",
+        "content": "", "fontSize": "12px", "color": "#e8eaf0",
         "textValign": "bottom", "textMarginY": 8,
         "textOutlineColor": "#0a0a0f",
         "textOutlineWidth": 2, "fontFamily": "Inter, sans-serif",
@@ -155,26 +176,28 @@ CYTO_STYLESHEET: list[dict] = [
     # Topic 树根：琥珀种子光球，深色文字置于球内
     {"selector": ".topic", "style": {
         "shape": "ellipse", "width": 108, "height": 108,
-        "backgroundColor": "#ffb300", "backgroundFill": "solid",
+        "backgroundColor": "transparent", "backgroundOpacity": 0,
         "backgroundImage": _IMG["topic"],
         "backgroundWidth": "100%", "backgroundHeight": "100%",
         "borderWidth": 0,
         "color": "#1a1207", "textOutlineWidth": 0, "fontWeight": "bold",
         "fontSize": "13px", "textValign": "center", "textMarginY": 0,
         "textMaxWidth": "76px",
+        "content": "data(label)",
         # Cytoscape underlay is rectangular; the seed SVG already contains a round halo.
         "underlayOpacity": 0,
     }},
-    # Question：蓝色六瓣花（主枝锚点，标签常驻）
+    # Question：蓝色六瓣花（主枝关键锚点，唯一常驻文字导览）
     {"selector": ".question", "style": {
-        "shape": "ellipse", "width": 60, "height": 60,
-        "backgroundColor": "#3d6fc4", "backgroundFill": "solid",
+        "shape": "ellipse", "width": 62, "height": 62,
+        "backgroundColor": "transparent", "backgroundOpacity": 0,
         "backgroundImage": _IMG["question"],
         "backgroundWidth": "100%", "backgroundHeight": "100%",
         "borderWidth": 0,
-        "underlayColor": "#4c9aff", "underlayOpacity": 0.16, "underlayPadding": 8,
-        "fontSize": "13px", "fontWeight": 600,
-        "textWrap": "wrap", "textMaxWidth": "110px",
+        "underlayColor": "#4c9aff", "underlayOpacity": 0.2, "underlayPadding": 8,
+        "fontSize": "12px", "fontWeight": 700, "color": "#f0f4ff",
+        "textWrap": "wrap", "textMaxWidth": "120px",
+        "content": "data(label)",
     }},
     # Claim：果实（径向渐变球体），大小=证据数，透明度=置信度；
     # 标签默认隐藏，选中/生长高光时显现（避免文字堆砌，详情看右栏）
@@ -182,7 +205,7 @@ CYTO_STYLESHEET: list[dict] = [
         "shape": "ellipse",
         "width": "mapData(evidence_count, 0, 6, 42, 84)",
         "height": "mapData(evidence_count, 0, 6, 42, 84)",
-        "backgroundColor": "#66bb6a", "backgroundFill": "solid",
+        "backgroundColor": "transparent", "backgroundOpacity": 0,
         "backgroundImage": _IMG["claim"],
         "backgroundWidth": "100%", "backgroundHeight": "100%",
         "borderWidth": 0,
@@ -205,7 +228,7 @@ CYTO_STYLESHEET: list[dict] = [
     # Event：星火（光晕四角星芒），里程碑感；标签默认隐藏
     {"selector": ".event", "style": {
         "shape": "ellipse", "width": 56, "height": 56,
-        "backgroundColor": "#f26d21", "backgroundFill": "solid",
+        "backgroundColor": "transparent", "backgroundOpacity": 0,
         "backgroundImage": _IMG["event"],
         "backgroundWidth": "100%", "backgroundHeight": "100%",
         "borderWidth": 0,
@@ -218,7 +241,7 @@ CYTO_STYLESHEET: list[dict] = [
     # Source：绿色证据小叶，标签默认隐藏（选中时才显示）
     {"selector": ".source", "style": {
         "shape": "ellipse", "width": 20, "height": 20,
-        "backgroundColor": "#43a047", "backgroundFill": "solid",
+        "backgroundColor": "transparent", "backgroundOpacity": 0,
         "backgroundImage": _IMG["source"],
         "backgroundWidth": "100%", "backgroundHeight": "100%",
         "borderWidth": 0, "opacity": 0.85,
@@ -246,7 +269,12 @@ CYTO_STYLESHEET: list[dict] = [
     {"selector": ".bend-right", "style": {
         "controlPointWeights": [0.25, 0.75], "controlPointDistances": [26, -34],
     }},
-    # 主干/分枝：达·芬奇枝粗 + 木质渐变（嫩梢浅 → 老木深）
+    # 主干/分枝/根系：达·芬奇枝粗 + 木质渐变（嫩梢浅 → 老木深）
+    {"selector": ".root", "style": {
+        "width": "data(w)",
+        "lineFill": "linear-gradient",
+        "lineGradientStopColors": "rgba(141,110,99,.9) rgba(62,39,35,.95)",
+    }},
     {"selector": ".trunk", "style": {
         "width": "data(w)",
         "lineFill": "linear-gradient",
@@ -261,10 +289,10 @@ CYTO_STYLESHEET: list[dict] = [
     {"selector": ".evidence", "style": {
         "width": 1, "lineColor": "rgba(161,136,127,.4)",
     }},
-    # 关系边：颜色承载语义 + 保留箭头表达演化方向；只有关系边显示标签
+    # 关系边：颜色承载语义 + 保留箭头表达演化方向；默认无字，悬浮/选中/高光显现
     {"selector": ".rel-supports, .rel-contradicts, .rel-evolves_into", "style": {
-        "curveStyle": "bezier", "targetArrowShape": "triangle", "arrowScale": 0.9,
-        "content": "data(label)", "fontSize": "10px", "fontWeight": 600,
+        "curveStyle": "bezier", "targetArrowShape": "triangle", "arrowScale": 0.8,
+        "content": "", "fontSize": "10px", "fontWeight": 600,
         "color": "#c3c9dd",
         "textRotation": "autorotate", "textOutlineColor": "#0a0a0f",
         "textOutlineWidth": 3, "minZoomedFontSize": 7,
@@ -281,16 +309,23 @@ CYTO_STYLESHEET: list[dict] = [
         "lineStyle": "solid", "lineColor": "rgba(179,136,255,.75)",
         "targetArrowColor": "rgba(179,136,255,.75)",
     }},
-    # 聚焦交互（M5）：其余淡出 / 邻居高亮
-    {"selector": ".faded", "style": {"opacity": 0.12, "underlayOpacity": 0}},
-    {"selector": "edge.faded", "style": {"opacity": 0.06}},
+    # 聚焦交互：其余隐去（柔和退后），但绝不退化成纯圆点（保持花/果/叶真实植物轮廓）
+    {"selector": ".faded", "style": {"opacity": 0.32, "underlayOpacity": 0}},
+    {"selector": "edge.faded", "style": {"opacity": 0.18}},
     {"selector": ".highlighted", "style": {
-        "underlayOpacity": 0, "borderWidth": 2, "borderColor": "#65f6b5",
-        "content": "data(label)", "fontSize": "12px", "fontWeight": 600,
+        "underlayOpacity": 0.35, "underlayColor": "#65f6b5", "underlayPadding": 6,
+        "borderWidth": 3, "borderColor": "#65f6b5", "opacity": 1.0, "zIndex": 990,
     }},
-    {"selector": "edge.highlighted", "style": {
-        "width": 3.5, "opacity": 1,
-        "lineColor": "#ffd54f", "targetArrowColor": "#ffd54f",
+    {"selector": "node.highlighted.claim, node.highlighted.question, node.highlighted.topic", "style": {
+        "content": "data(label)", "fontSize": "12px", "fontWeight": 700,
+        "color": "#fff", "textOutlineColor": "#0a0a0f", "textOutlineWidth": 3,
+    }},
+    {"selector": "node.highlighted.source", "style": {
+        "content": "",
+    }},
+    {"selector": "edge:selected, edge.highlighted", "style": {
+        "width": 3.5, "opacity": 1, "content": "",
+        "lineColor": "#ffd54f", "targetArrowColor": "#ffd54f", "zIndex": 980,
     }},
 ]
 
@@ -312,12 +347,178 @@ def get_service() -> DemoService:
     return _service
 
 
-# ── layout ───────────────────────────────────────────────────────────────
+# ── helpers ──────────────────────────────────────────────────────────────
+
+def _build_source_list(sources: list[SearchItem] | list[dict]) -> html.Div:
+    if not sources:
+        return html.Div("暂无来源", className="annotation")
+
+    def _get_val(s, key, default=None):
+        if isinstance(s, dict):
+            return s.get(key, default)
+        return getattr(s, key, default)
+
+    # 排序：高赞同优先，丰富正文优先
+    sorted_sources = sorted(
+        sources,
+        key=lambda s: (_get_val(s, "vote_up_count") or 0, len(_get_val(s, "content_text") or "")),
+        reverse=True,
+    )
+
+    def _render_item(s, idx: int):
+        author = _get_val(s, "author_name") or "知乎答主"
+        votes = _get_val(s, "vote_up_count") or 0
+        vote_badge = f"▲ {votes}" if votes > 0 else ""
+        raw_time = _get_val(s, "edit_time")
+        year_str = str(raw_time)[:4] if raw_time else ""
+        url = str(_get_val(s, "url") or "")
+        title = _get_val(s, "title") or "知乎回答"
+        return html.Div(
+            className="source-item-compact",
+            children=[
+                html.Div(className="source-item-meta", children=[
+                    html.Span(f"#{idx+1}", className="source-item-index"),
+                    html.Span(author, className="source-item-author"),
+                    html.Span(vote_badge, className="source-item-votes") if vote_badge else None,
+                    html.Span(year_str, className="source-item-year") if year_str else None,
+                ]),
+                html.A(
+                    title,
+                    href=url,
+                    target="_blank",
+                    className="source-item-link",
+                    title=title,
+                ),
+            ],
+        )
+
+    # 默认精选展示 Top 6 核心高赞文献，大幅压缩高度
+    featured_sources = sorted_sources[:6]
+    remaining_sources = sorted_sources[6:]
+
+    featured_items = [_render_item(s, i) for i, s in enumerate(featured_sources)]
+
+    more_section = None
+    if remaining_sources:
+        remaining_items = [_render_item(s, i + 6) for i, s in enumerate(remaining_sources)]
+        more_section = html.Details(
+            className="source-details-expand",
+            children=[
+                html.Summary(
+                    f"展开更多文献（余下 {len(remaining_sources)} 篇 · 点击展开/收起）▼",
+                    className="source-expand-summary",
+                ),
+                html.Div(remaining_items, className="source-remaining-list"),
+            ],
+        )
+
+    return html.Div([
+        html.Div(className="source-list-header", children=[
+            html.Span("知乎权威文献", className="source-header-title"),
+            html.Span(f"共 {len(sources)} 篇", className="source-count-badge"),
+        ]),
+        html.Div(featured_items, className="source-featured-list"),
+        more_section,
+    ])
 
 
 def _legend_swatch(color: str, extra_class: str = "") -> html.Span:
     return html.Span(className=f"legend-swatch {extra_class}".strip(),
                      style={"background": color} if color else {})
+
+
+def _is_edge(el: dict) -> bool:
+    d = el.get("data", {})
+    return "source" in d and "target" in d
+
+
+def _year_counts(elements: list[dict]) -> dict[int, int]:
+    counts: dict[int, int] = {}
+    for el in elements:
+        if _is_edge(el):
+            continue
+        d = el["data"]
+        if d.get("node_type") in ("topic", "source"):
+            continue
+        y = d.get("year")
+        if y:
+            counts[y] = counts.get(y, 0) + 1
+    return counts
+
+
+def _build_time_band(years: list[int], counts: dict[int, int],
+                     current_year: int | None) -> list:
+    """年轮时间带：回放到哪一年，对应环点亮（含该年新增节点数）。"""
+    if not years:
+        return [html.Div("生成世界树后按年份点亮", className="legend-desc")]
+    children = []
+    for y in years:
+        active = current_year is None or y <= current_year
+        children.append(html.Div(
+            className=f"timeband-year {'active' if active else ''}",
+            children=[html.Span(className="ring"), html.Span(str(y)),
+                      html.Span(f"+{counts.get(y, 0)}", className="count")],
+        ))
+    return children
+
+
+# ── initial showcase load & in-memory exhibition cache ────────────────────
+
+_warmup_cache = load_warmup_topics()
+_PRECOMPUTED_TOPICS: dict[str, dict] = {}
+for _t in WARMUP_TOPICS:
+    _asset = _warmup_cache.get(_t)
+    if _asset:
+        _b = _asset["bundle"]
+        _s = _asset["sources"]
+        _nodes, _edges = present(_b, _s)
+        _elem = _nodes + _edges
+        _years = sorted({_n["data"]["year"] for _n in _nodes if _n["data"].get("year")})
+        _counts = _year_counts(_elem)
+        _marks = {i: str(y) for i, y in enumerate(_years)}
+        _marks[len(_years)] = "全部"
+        _PRECOMPUTED_TOPICS[_t] = {
+            "bundle": _b,
+            "sources": _s,
+            "elements": _elem,
+            "years": _years,
+            "counts": _counts,
+            "marks": _marks,
+            "source_list": _build_source_list(_s),
+            "time_band": _build_time_band(_years, _counts, None),
+            "year_axis": [html.Span(str(y)) for y in _years],
+            "bundle_dump": _b.model_dump(mode="json"),
+            "sources_dump": [s.model_dump(mode="json") for s in _s],
+            "queries": _asset.get("queries", []),
+            "btn_classes": [
+                f"btn warmup-btn active" if t == _t else "btn warmup-btn"
+                for t in WARMUP_TOPICS
+            ],
+        }
+
+_default_topic = WARMUP_TOPICS[0] if WARMUP_TOPICS else "RAG"
+_init_cached = _PRECOMPUTED_TOPICS.get(_default_topic)
+
+if _init_cached:
+    _init_bundle = _init_cached["bundle"]
+    _init_sources = _init_cached["sources"]
+    _init_elements = _init_cached["elements"]
+    _init_source_list = _init_cached["source_list"]
+    _init_bundle_store = _init_cached["bundle_dump"]
+    _init_sources_store = _init_cached["sources_dump"]
+    _init_run_state = {
+        "run_id": None,
+        "queries": _init_cached.get("queries", []),
+        "topic": _default_topic,
+        "status": "completed",
+        "warmup": True,
+    }
+else:
+    _init_elements = []
+    _init_source_list = html.Div("暂无信源", className="annotation")
+    _init_bundle_store = None
+    _init_sources_store = []
+    _init_run_state = {"status": "idle"}
 
 
 app.layout = html.Div(
@@ -339,46 +540,37 @@ app.layout = html.Div(
                 html.Div([
                     html.Div([
                         html.Span("EPISTREE", className="brand-name"),
-                        html.Span("LIVE", className="live-chip"),
+                        html.Span("EXHIBITION", className="live-chip"),
                     ], className="brand-line"),
-                    html.Div("ZHIHU KNOWLEDGE EVOLUTION ENGINE", className="brand-sub"),
+                    html.Div("ZHIHU FRONTIER AI KNOWLEDGE WORLD TREE", className="brand-sub"),
+                ]),
+            ]),
+            html.Div(className="topbar-center", children=[
+                html.Div(className="pavilion-pills", children=[
+                    html.Button(
+                        [
+                            html.Span(f"展区 {i+1}", className="pavilion-badge"),
+                            html.Span(TOPIC_ICONS.get(t, "🌱"), style={"marginRight": "4px"}),
+                            html.Span(t),
+                        ],
+                        id=f"warmup-{i}",
+                        className=f"btn warmup-btn {'active' if i == 0 else ''}",
+                    )
+                    for i, t in enumerate(WARMUP_TOPICS)
                 ]),
             ]),
             html.Div(className="topbar-controls", children=[
-                html.Div(className="command-input", children=[
-                    html.Span("⌕", className="command-icon"),
-                    dcc.Input(
-                        id="topic-input",
-                        type="text",
-                        placeholder="探索一个知识主题…",
-                        maxLength=50,
-                    ),
-                    html.Span("↵", className="key-hint"),
-                ]),
-                html.Div(className="command-actions", children=[
-                    html.Button("构建查询", id="btn-build-queries", className="btn btn-secondary"),
-                    html.Button([html.Span(className="btn-spark"), "生成世界树"],
-                                id="btn-generate", className="btn btn-primary", disabled=True),
-                    html.Button("停止", id="btn-cancel", className="btn btn-ghost"),
-                    html.Button("导出", id="btn-export", className="btn btn-ghost"),
-                ]),
+                html.Div(
+                    id="quota-info",
+                    className="quota-info",
+                    children=[
+                        html.Span(f"当前展区：{_default_topic} · 378 节点全景", className="tag tag-cache"),
+                    ],
+                ),
+                html.Button([html.Span("↓ "), "导出当前图谱"], id="btn-export", className="btn btn-secondary"),
             ]),
-            html.Div(id="quota-info", className="quota-info"),
         ]),
 
-        # 预热主题
-        html.Div(className="warmup-row", children=[
-            html.Span("QUICK ACCESS", className="warmup-label"),
-            *[html.Button(t, id=f"warmup-{i}", className="btn warmup-btn")
-              for i, t in enumerate(WARMUP_TOPICS)],
-            html.Span("选择预载知识域 · 0 API CALL", className="warmup-note"),
-        ]),
-
-        # 进度线
-        html.Div(id="progress-area", className="progress-area"),
-
-        # 查询预览
-        html.Div(id="query-list", className="query-list"),
 
         # ── 主区三栏 ──────────────────────────────────────────────────
         html.Div(className="main-grid", children=[
@@ -431,11 +623,27 @@ app.layout = html.Div(
                              "点击节点查看详情，Esc 退出聚焦",
                              className="legend-note"),
                 ]),
-                html.Div(className="glass-panel timeband-panel", children=[
-                    html.Div([html.Span("02"), "时间信号"], className="panel-title"),
-                    html.Div(id="time-band",
-                             children=[html.Div("生成世界树后按年份点亮",
-                                                className="legend-desc")]),
+                html.Div(className="glass-panel metrics-panel", children=[
+                    html.Div([html.Span("02"), "展区生态"], className="panel-title"),
+                    html.Div(className="metrics-grid", children=[
+                        html.Div(className="metric-card", children=[
+                            html.Span("14", className="metric-val"),
+                            html.Span("问题主枝", className="metric-lbl"),
+                        ]),
+                        html.Div(className="metric-card", children=[
+                            html.Span("42", className="metric-val"),
+                            html.Span("演进观点", className="metric-lbl"),
+                        ]),
+                        html.Div(className="metric-card", children=[
+                            html.Span("14", className="metric-val"),
+                            html.Span("孕育根系", className="metric-lbl"),
+                        ]),
+                        html.Div(className="metric-card", children=[
+                            html.Span(f"{len(_init_sources)}", className="metric-val"),
+                            html.Span("知乎文献", className="metric-lbl"),
+                        ]),
+                    ]),
+                    html.Div(id="time-band", style={"display": "none"}),
                 ]),
             ]),
 
@@ -445,6 +653,8 @@ app.layout = html.Div(
                     html.Div("KNOWLEDGE TOPOLOGY", className="hud-kicker"),
                     html.Div("知识演化场", className="hud-title"),
                     html.Div("时间向上生长 · 观点横向分化", className="hud-sub"),
+                    html.Button("🌿 退出聚焦 / 显示全景", id="btn-reset-focus", className="btn-hud-reset",
+                                title="点击恢复全树视角 (快捷键: ESC / 点击画布空白)"),
                 ]),
                 html.Div(className="canvas-status", children=[
                     html.Span(className="status-dot"),
@@ -462,10 +672,10 @@ app.layout = html.Div(
                         "animationEasing": "ease-out",
                     },
                     style={"width": "100%", "height": "100%"},
-                    elements=[],
+                    elements=_init_elements,
                     stylesheet=CYTO_STYLESHEET,
                 ),
-                html.Div(id="year-axis", className="year-axis"),
+                html.Div(id="year-axis", style={"display": "none"}),
                 html.Div(className="canvas-hints", children=[
                     html.Span("SCROLL / ZOOM"),
                     html.Span("DRAG / NAVIGATE"),
@@ -478,10 +688,10 @@ app.layout = html.Div(
                 html.Div(className="glass-panel detail-panel", children=[
                     html.Div([html.Span("03"), "节点情报"], className="panel-title"),
                     html.Div(id="node-detail", className="node-detail",
-                             children="点击节点查看详情"),
+                             children="点击树上任意节点（果实/花朵/星火/叶片）查看论据与知乎真实引文"),
                 ]),
                 html.Div(className="glass-panel sources-panel", children=[
-                    html.Div(id="source-list", className="source-list"),
+                    html.Div(id="source-list", className="source-list", children=_init_source_list),
                 ]),
             ]),
         ]),
@@ -516,9 +726,9 @@ app.layout = html.Div(
             ),
         ]),
 
-        dcc.Store(id="run-state", data={"run_id": None, "queries": [], "topic": "", "status": "idle"}),
-        dcc.Store(id="graph-bundle-store", data=None),
-        dcc.Store(id="sources-store", data=None),
+        dcc.Store(id="run-state", data=_init_run_state),
+        dcc.Store(id="graph-bundle-store", data=_init_bundle_store),
+        dcc.Store(id="sources-store", data=_init_sources_store),
         dcc.Store(id="progress-store", data={"step": "", "progress": 0, "status": "idle"}),
         dcc.Store(id="elements-store", data=None),
         dcc.Store(id="years-store", data=[]),
@@ -532,7 +742,7 @@ app.layout = html.Div(
 )
 
 
-# ── warmup topics → fill input and render the matching asset ─────────────
+# ── warmup topics → render the matching exhibition asset ─────────────────
 
 _WARMUP_INPUTS = [Input(f"warmup-{i}", "n_clicks") for i in range(len(WARMUP_TOPICS))]
 
@@ -548,236 +758,58 @@ def _warmup_topic_for_trigger(trigger_id: object) -> str | None:
 
 
 def _triggered_warmup_topic() -> str | None:
-    return _warmup_topic_for_trigger(ctx.triggered_id)
-
-
-@callback(
-    Output("topic-input", "value"),
-    *_WARMUP_INPUTS,
-    prevent_initial_call=True,
-)
-def _fill_topic(*_clicks):
-    return _triggered_warmup_topic() or no_update
+    tid = ctx.triggered_id
+    if tid:
+        topic = _warmup_topic_for_trigger(tid)
+        if topic:
+            return topic
+    for trig in (ctx.triggered or []):
+        prop_id = trig.get("prop_id", "")
+        cand_id = prop_id.split(".")[0]
+        topic = _warmup_topic_for_trigger(cand_id)
+        if topic:
+            return topic
+    return None
 
 
 @callback(
     Output("cytoscape-graph", "elements", allow_duplicate=True),
+    Output("cytoscape-graph", "layout", allow_duplicate=True),
     Output("node-detail", "children", allow_duplicate=True),
     Output("source-list", "children", allow_duplicate=True),
     Output("quota-info", "children", allow_duplicate=True),
     Output("graph-bundle-store", "data", allow_duplicate=True),
     Output("sources-store", "data", allow_duplicate=True),
     Output("run-state", "data", allow_duplicate=True),
-    Output("btn-generate", "disabled", allow_duplicate=True),
+    *[Output(f"warmup-{i}", "className") for i in range(len(WARMUP_TOPICS))],
     *_WARMUP_INPUTS,
     prevent_initial_call=True,
 )
 def _show_warmup(*_clicks):
     topic = _triggered_warmup_topic()
     if topic is None:
-        return [no_update] * 8
-    asset = load_warmup_topics().get(topic)
-    if not asset:
-        return [no_update] * 8
-    bundle, sources = asset["bundle"], asset["sources"]
-    nodes, edges = present(bundle, sources)
+        return [no_update] * (8 + len(WARMUP_TOPICS))
+    cached = _PRECOMPUTED_TOPICS.get(topic)
+    if not cached:
+        return [no_update] * (8 + len(WARMUP_TOPICS))
     return (
-        nodes + edges,
-        "点击节点查看详情",
-        _build_source_list(sources),
-        html.Div("📦 预热资产：离线缓存（0 次真实调用）"),
-        bundle.model_dump(mode="json"),
-        [s.model_dump(mode="json") for s in sources],
+        cached["elements"],
+        {"name": "preset", "fit": True, "padding": 40, "animate": True, "animationDuration": 600, "animationEasing": "ease-out"},
+        "点击树上任意节点查看论据与知乎真实引文",
+        cached["source_list"],
+        html.Span(f"当前展区：{topic} · {len(cached['elements'])} 元素繁茂知识树", className="tag tag-cache"),
+        cached["bundle_dump"],
+        cached["sources_dump"],
         {
             "run_id": None,
-            "queries": asset.get("queries", []),
+            "queries": cached.get("queries", []),
             "topic": topic,
             "status": "completed",
             "warmup": True,
         },
-        True,
+        *cached["btn_classes"],
     )
 
-
-# ── build queries ────────────────────────────────────────────────────────
-
-@callback(
-    Output("query-list", "children"),
-    Output("btn-generate", "disabled"),
-    Output("run-state", "data", allow_duplicate=True),
-    Input("btn-build-queries", "n_clicks"),
-    State("topic-input", "value"),
-    State("run-state", "data"),
-    prevent_initial_call=True,
-)
-def _build_queries(n, topic, run_state):
-    if not topic or len(topic.strip()) < 2:
-        return "请输入 2–50 个字符的主题", True, run_state
-
-    topic = topic.strip()
-    try:
-        queries = get_service().build_queries(topic)
-    except ValueError as e:
-        return html.Div(f"主题错误：{e}", style={"color": "#c62828"}), True, run_state
-
-    children = [
-        html.Div(f"主题：{topic}", style={"fontWeight": 600, "marginBottom": "8px"}),
-    ]
-    for q in queries:
-        children.append(
-            html.Div(className="query-item", children=[
-                dcc.Checklist(
-                    options=[{"label": "", "value": "active"}],
-                    value=["active"],
-                    id={"type": "query-check", "index": len(children)},
-                    style={"marginRight": "4px"},
-                ),
-                dcc.Input(
-                    value=q,
-                    maxLength=200,
-                    style={"flex": 1, "padding": "4px 8px", "border": "1px solid #ddd", "borderRadius": "4px"},
-                    id={"type": "query-input", "index": len(children)},
-                ),
-            ])
-        )
-
-    run_state = {**run_state, "queries": queries, "topic": topic, "status": "queries_built"}
-    return children, False, run_state
-
-
-# ── generate world tree (full pipeline) ──────────────────────────────────
-
-@callback(
-    Output("cytoscape-graph", "elements"),
-    Output("node-detail", "children"),
-    Output("source-list", "children"),
-    Output("quota-info", "children"),
-    Output("graph-bundle-store", "data"),
-    Output("sources-store", "data"),
-    Output("run-state", "data", allow_duplicate=True),
-    Output("btn-generate", "disabled", allow_duplicate=True),
-    Input("btn-generate", "n_clicks"),
-    State("btn-cancel", "n_clicks"),
-    State("run-state", "data"),
-    State("topic-input", "value"),
-    State({"type": "query-input", "index": ALL}, "value"),
-    State({"type": "query-check", "index": ALL}, "value"),
-    background=True,
-    cancel=[Input("btn-cancel", "n_clicks")],
-    progress=Output("progress-store", "data"),
-    running=[(Output("btn-generate", "disabled"), True, False)],
-    prevent_initial_call=True,
-)
-def _generate(set_progress, n, _cancel_clicks, run_state, topic, edited_queries=None, checks=None):
-    if not topic or len(topic.strip()) < 2:
-        return [no_update] * 8
-
-    topic = topic.strip()
-    svc = get_service()
-
-    try:
-        # Create run
-        run_id = svc.create_run(topic)
-
-        # Get queries from run_state or build fresh
-        submitted_query_state = edited_queries is not None or checks is not None
-        queries = [q for q, active in zip(edited_queries or [], checks or [])
-                   if q and active and "active" in active]
-        if submitted_query_state and not queries:
-            svc.fail_run(run_id, "INVALID_QUERY", "NO_ACTIVE_QUERIES: 至少保留一条查询")
-            return (
-                [], html.Div("⚠ 未选择任何查询，未发起网络请求。", className="tag tag-warning"),
-                "", "", None, None, {**run_state, "status": "failed"}, True,
-            )
-        if not queries:
-            queries = run_state.get("queries", []) or svc.build_queries(topic)
-
-        # Search
-        svc.db.update_run_status(run_id, "running")
-        if set_progress:
-            set_progress({"run_id": run_id, "step": "搜索", "progress": 25, "status": "running"})
-        selected_sources, stats = svc.execute_search(run_id, queries)
-        if svc.get_run(run_id)["status"] == "cancelled":
-            if set_progress:
-                set_progress({"run_id": run_id, "step": "已取消", "progress": 0, "status": "cancelled"})
-            return [], "", "", "", None, None, {**run_state, "run_id": run_id, "status": "cancelled"}, True
-
-        if len(selected_sources) < 3:
-            run_status = "failed"
-            svc.fail_run(run_id, "INSUFFICIENT_SOURCES",
-                         f"仅找到 {len(selected_sources)} 条唯一来源，需要至少 3 条")
-            quota_info = html.Div([
-                html.Span(f"⚠ 来源不足：{len(selected_sources)} 条唯一来源"),
-            ])
-            return [], "", "", quota_info, None, None, {**run_state, "status": run_status}, True
-
-        # Extract knowledge
-        if set_progress:
-            set_progress({"run_id": run_id, "step": "抽取", "progress": 70, "status": "running"})
-        bundle, bundle_id = svc.extract_knowledge_with_id(topic, selected_sources)
-
-        if not bundle.claims:
-            svc.fail_run(run_id, "NO_CLAIMS", "模型未提取到任何 Claim")
-            quota_info = html.Div([
-                html.Span(f"⚠ 模型未能提取 Claim（{len(bundle.questions)} 个问题）"),
-            ])
-            return [], "", "", quota_info, None, None, {**run_state, "status": "failed"}, True
-
-        # Complete run
-        svc.complete_run(run_id, bundle, stats, bundle_id)
-
-        # Present
-        nodes, edges = present(bundle, selected_sources)
-        elements = nodes + edges
-
-        detail_html = "点击节点查看详情"
-        source_html = _build_source_list(selected_sources)
-        quota_info = _build_quota_info(stats)
-
-        run_state = {
-            **run_state, "run_id": run_id, "bundle_id": bundle_id,
-            "stats": stats, "status": "completed",
-        }
-
-        if set_progress:
-            set_progress({"run_id": run_id, "step": "完成", "progress": 100, "status": "completed"})
-        return (
-            elements, detail_html, source_html, quota_info,
-            bundle.model_dump(mode="json"),
-            [s.model_dump(mode="json") for s in selected_sources],
-            run_state, False,
-        )
-
-    except PermissionError:
-        svc.fail_run(run_id, "AUTH_REQUIRED", "知乎 Access Secret 未配置")
-        return (
-            [],
-            html.Div("❌ 知乎 API 认证失败。请配置 ZHIHU_ACCESS_SECRET。",
-                     style={"color": "#c62828", "padding": "16px"}),
-            "", "",
-            None, None,
-            {**run_state, "status": "failed"}, True,
-        )
-    except ValueError as e:
-        error_msg = str(e)
-        svc.fail_run(run_id, "MODEL_VALIDATION_FAILED", error_msg)
-        return (
-            [], html.Div("⚠ 来源或模型结果校验失败，请稍后重试。", className="tag tag-warning"),
-            "", "", None, None, {**run_state, "status": "failed"}, True,
-        )
-    except RuntimeError as e:
-        error_msg = str(e)
-        if "MODEL_VALIDATION_FAILED" in error_msg:
-            svc.fail_run(run_id, "MODEL_VALIDATION_FAILED", error_msg)
-            return (
-                [], html.Div("⚠ 模型输出验证失败，请稍后重试。", style={"color": "#e65100", "padding": "16px"}),
-                "", "", None, None, {**run_state, "status": "failed"}, True,
-            )
-        svc.fail_run(run_id, "UPSTREAM_FAILED", error_msg)
-        return (
-            [], html.Div(f"⚠ {error_msg}", style={"color": "#e65100", "padding": "16px"}),
-            "", "", None, None, {**run_state, "status": "failed"}, True,
-        )
 
 
 # ── node click detail ────────────────────────────────────────────────────
@@ -797,8 +829,34 @@ def _node_click(node_data, sources_data):
     full_text = node_data.get("full_text", "")
     source_refs = node_data.get("source_refs", [])
 
-    children = []
-    children.append(html.Div(f"类型：{node_type}", className="node-detail-label"))
+    node_type_names = {
+        "question": "🌿 核心议题主枝",
+        "claim": "🍎 观点论断果实",
+        "source": "🍃 知乎专业文献绿叶",
+        "event": "✨ 奠基历史深根",
+        "topic": "🌳 知识世界树种子",
+    }
+    type_display = node_type_names.get(node_type, f"类型：{node_type}")
+
+    header_row = html.Div(
+        style={
+            "display": "flex",
+            "justifyContent": "space-between",
+            "alignItems": "center",
+            "marginBottom": "6px",
+        },
+        children=[
+            html.Div(type_display, className="node-detail-label"),
+            html.Button("✕ 退出聚焦", id="btn-unfocus-panel",
+                        style={"fontSize": "10px", "padding": "2px 8px",
+                               "background": "rgba(255,255,255,0.08)",
+                               "border": "1px solid rgba(255,255,255,0.15)",
+                               "borderRadius": "10px", "color": "#94a3b8", "cursor": "pointer"},
+                        title="退出聚焦，显示完整全树"),
+        ],
+    )
+
+    children = [header_row]
     children.append(html.H3(label))
 
     if full_text:
@@ -886,12 +944,16 @@ def _time_filter(value, elements, bundle_data=None, sources_data=None):
     if not elements and not bundle_data:
         return no_update
     if bundle_data:
-        from .models import GraphBundle, SearchItem
-        full_nodes, full_edges = present(
-            GraphBundle.model_validate(bundle_data),
-            [SearchItem.model_validate(item) for item in (sources_data or [])],
-        )
-        elements = full_nodes + full_edges
+        topic = bundle_data.get("topic") if isinstance(bundle_data, dict) else None
+        if topic and topic in _PRECOMPUTED_TOPICS:
+            elements = _PRECOMPUTED_TOPICS[topic]["elements"]
+        else:
+            from .models import GraphBundle, SearchItem
+            full_nodes, full_edges = present(
+                GraphBundle.model_validate(bundle_data),
+                [SearchItem.model_validate(item) for item in (sources_data or [])],
+            )
+            elements = full_nodes + full_edges
     if value in (None, "all"):
         return elements
     source_map = {s.get("source_id"): s for s in (sources_data or [])}
@@ -926,32 +988,6 @@ def _time_filter(value, elements, bundle_data=None, sources_data=None):
             and e.get("data", {}).get("target") in visible_ids or "source" not in e.get("data", {})]
 
 
-@callback(
-    Output("run-state", "data", allow_duplicate=True),
-    Output("progress-store", "data", allow_duplicate=True),
-    Input("btn-cancel", "n_clicks"),
-    State("progress-store", "data"),
-    prevent_initial_call=True,
-)
-def _cancel_run(_n, progress):
-    run_id = (progress or {}).get("run_id")
-    if not run_id:
-        return no_update, {"status": "idle", "step": "", "progress": 0}
-    get_service().cancel_run(run_id)
-    return {"run_id": run_id, "status": "cancelled"}, {
-        "run_id": run_id, "status": "cancelled", "step": "已取消", "progress": 0,
-    }
-
-
-@callback(Output("progress-area", "children"), Input("progress-store", "data"))
-def _show_progress(progress):
-    if not progress or progress.get("status") in (None, "idle"):
-        return no_update
-    return html.Div(
-        f"{progress.get('step', '处理中')} · {progress.get('progress', 0)}%",
-        className="progress-tag",
-    )
-
 
 # ── time playback：生长动画与时间回放（设计文档 §6.1）────────────────────
 
@@ -961,10 +997,6 @@ _LAYOUT_FIT = {"name": "preset", "fit": True, "padding": 40,
                "animate": True, "animationDuration": 600, "animationEasing": "ease-out"}
 _LAYOUT_NOFIT = {"name": "preset", "fit": False,
                  "animate": True, "animationDuration": 600, "animationEasing": "ease-out"}
-
-def _is_edge(el: dict) -> bool:
-    d = el.get("data", {})
-    return "source" in d and "target" in d
 
 
 # 逐节点生长顺序：同一年里 question（枝）先于 event / claim（果）
@@ -1057,36 +1089,6 @@ def _slice_elements(elements: list[dict], step_idx: int | None,
     return out
 
 
-def _year_counts(elements: list[dict]) -> dict[int, int]:
-    counts: dict[int, int] = {}
-    for el in elements:
-        if _is_edge(el):
-            continue
-        d = el["data"]
-        if d.get("node_type") in ("topic", "source"):
-            continue
-        y = d.get("year")
-        if y:
-            counts[y] = counts.get(y, 0) + 1
-    return counts
-
-
-def _build_time_band(years: list[int], counts: dict[int, int],
-                     current_year: int | None) -> list:
-    """年轮时间带：回放到哪一年，对应环点亮（含该年新增节点数）。"""
-    if not years:
-        return [html.Div("生成世界树后按年份点亮", className="legend-desc")]
-    children = []
-    for y in years:
-        active = current_year is None or y <= current_year
-        children.append(html.Div(
-            className=f"timeband-year {'active' if active else ''}",
-            children=[html.Span(className="ring"), html.Span(str(y)),
-                      html.Span(f"+{counts.get(y, 0)}", className="count")],
-        ))
-    return children
-
-
 @callback(
     Output("elements-store", "data"),
     Output("years-store", "data"),
@@ -1099,11 +1101,25 @@ def _build_time_band(years: list[int], counts: dict[int, int],
     Output("year-axis", "children"),
     Input("graph-bundle-store", "data"),
     State("sources-store", "data"),
-    prevent_initial_call=True,
+    prevent_initial_call=False,
 )
 def _prepare_playback(bundle_data, sources_data):
     if not bundle_data:
         return [no_update] * 9
+    topic = bundle_data.get("topic") if isinstance(bundle_data, dict) else None
+    if topic and topic in _PRECOMPUTED_TOPICS:
+        cached = _PRECOMPUTED_TOPICS[topic]
+        return (
+            cached["elements"],
+            cached["years"],
+            len(cached["years"]),
+            cached["marks"],
+            len(cached["years"]),
+            {"playing": False, "step_idx": -1},
+            True,
+            cached["time_band"],
+            cached["year_axis"],
+        )
     from .models import GraphBundle, SearchItem
     nodes, edges = present(
         GraphBundle.model_validate(bundle_data),
@@ -1146,13 +1162,23 @@ def _playback(_play, _tick, slider_value, state, elements, years):
     trigger = ctx.triggered_id
 
     if trigger == "btn-play":
-        if state.get("playing"):  # 暂停
+        if state.get("playing"):  # 暂停：保留当前 step_idx，停止定时器
             return no_update, no_update, {**state, "playing": False}, True, no_update
-        # 从一颗种子开始长：首帧只露树根。不重 fit——当前视口已是全图取景，
-        # 相机不动，整棵树在同一坐标系内逐节点长出，不会有任何瞬间出现
-        return (_slice_elements(elements, -1, steps), _LAYOUT_NOFIT,
-                {"playing": True, "step_idx": -1}, False,
-                _build_time_band(years, counts, years[0] - 1))
+        # 播放 / 恢复播放：检查是否处于暂停位置
+        cur_idx = state.get("step_idx", -1)
+        if cur_idx == -1 or cur_idx >= len(steps):
+            # 从一颗种子开始长：首帧只露树根。不重 fit——当前视口已是全图取景，
+            # 相机不动，整棵树在同一坐标系内逐节点长出，不会有任何瞬间出现
+            return (_slice_elements(elements, -1, steps), _LAYOUT_NOFIT,
+                    {"playing": True, "step_idx": -1}, False,
+                    _build_time_band(years, counts, years[0] - 1))
+        else:
+            # 暂停后继续播放：从当前暂停步继续生长，不重置到根节点
+            cur_year = (step_years[cur_idx]
+                        if 0 <= cur_idx < len(step_years) else None)
+            return (_slice_elements(elements, cur_idx, steps), _LAYOUT_NOFIT,
+                    {"playing": True, "step_idx": cur_idx}, False,
+                    _build_time_band(years, counts, cur_year))
 
     if trigger == "playback-interval":
         if not state.get("playing"):
@@ -1190,7 +1216,12 @@ def _play_label(state):
     return "Ⅱ" if (state or {}).get("playing") else "▶"
 
 
-# ── 聚焦交互：点击节点高亮邻居、其余淡出（Kumu Focus / WikiGalaxy 光束）──
+# ── 聚焦交互：点击节点高亮枝干/果实/绿叶脉络，保留全树花果绿意 ────────
+
+def _strip_focus_classes(el: dict) -> dict:
+    cls = " ".join(c for c in el.get("classes", "").split() if c not in ("faded", "highlighted"))
+    return {**el, "classes": cls}
+
 
 @callback(
     Output("cytoscape-graph", "elements", allow_duplicate=True),
@@ -1204,52 +1235,160 @@ def _focus_node(node_data, elements, focus):
     if not node_data or not elements:
         return no_update, no_update
     nid = node_data.get("id")
-
-    def _strip(el):
-        return {**el, "classes": el.get("classes", "").replace(" faded", "").strip()}
+    if not nid:
+        return no_update, no_update
 
     if (focus or {}).get("node_id") == nid:
-        # 再次点击同一节点 → 取消聚焦
+        # 再次点击同一节点 → 取消聚焦，恢复全景
+        return [_strip_focus_classes(el) for el in elements], {"node_id": None}
+
+    node_type = node_data.get("node_type", "")
+
+    edge_list = []
+    node_map = {}
+    for el in elements:
+        if _is_edge(el):
+            edge_list.append(el)
+        else:
+            node_map[el["data"]["id"]] = el["data"]
+
+    hl_nodes = {nid}
+    hl_edges = set()
+
+    if node_type == "question" or nid.startswith("q_"):
+        # 议题主枝：议题 + 中心种子 + 该议题下全部观点果实 + 各果实所属全部文献绿叶/花朵
+        claims = set()
+        for el in elements:
+            if not _is_edge(el):
+                d = el["data"]
+                if d.get("node_type") == "claim" and d.get("question_id") == nid:
+                    claims.add(d["id"])
+        for e in edge_list:
+            d = e["data"]
+            if d["source"] == nid and d["target"] in node_map and node_map[d["target"]].get("node_type") == "claim":
+                claims.add(d["target"])
+            elif d["target"] == nid and d["source"] in node_map and node_map[d["source"]].get("node_type") == "claim":
+                claims.add(d["source"])
+
+        sources = set()
+        for e in edge_list:
+            d = e["data"]
+            if d["source"] in claims and d["target"] in node_map and node_map[d["target"]].get("node_type") == "source":
+                sources.add(d["target"])
+            elif d["target"] in claims and d["source"] in node_map and node_map[d["source"]].get("node_type") == "source":
+                sources.add(d["source"])
+
+        # 关联中心主题
+        for e in edge_list:
+            d = e["data"]
+            if (d["source"] == nid and d["target"].startswith("topic:")) or (d["target"] == nid and d["source"].startswith("topic:")):
+                hl_nodes.add(d["source"] if d["source"].startswith("topic:") else d["target"])
+
+        hl_nodes.update(claims)
+        hl_nodes.update(sources)
+
+        for e in edge_list:
+            d = e["data"]
+            if d["source"] in hl_nodes and d["target"] in hl_nodes:
+                hl_edges.add(d.get("id"))
+
+    elif node_type == "claim" or nid.startswith("c_"):
+        # 观点果实：果实 + 所属主枝 + 所引文献绿叶 + 认知关系(支持/反驳/演化)相连的果实
+        parent_q = node_data.get("question_id")
+        if parent_q:
+            hl_nodes.add(parent_q)
+
+        for e in edge_list:
+            d = e["data"]
+            if d["source"] == nid:
+                hl_nodes.add(d["target"])
+                hl_edges.add(d.get("id"))
+            elif d["target"] == nid:
+                hl_nodes.add(d["source"])
+                hl_edges.add(d.get("id"))
+
+    elif node_type == "source" or nid.startswith("source:") or nid.startswith("zhihu:"):
+        # 文献绿叶：绿叶 + 引用该文献的果实 + 所属主枝
+        citing_claims = set()
+        for e in edge_list:
+            d = e["data"]
+            if d["source"] == nid:
+                citing_claims.add(d["target"])
+                hl_edges.add(d.get("id"))
+            elif d["target"] == nid:
+                citing_claims.add(d["source"])
+                hl_edges.add(d.get("id"))
+        hl_nodes.update(citing_claims)
+        for cid in citing_claims:
+            c_data = node_map.get(cid, {})
+            if c_data.get("question_id"):
+                hl_nodes.add(c_data["question_id"])
+
+    elif node_type == "event" or nid.startswith("e_"):
+        # 历史深根：深根 + 中心种子 + 演化指向的观点
+        for e in edge_list:
+            d = e["data"]
+            if d["source"] == nid:
+                hl_nodes.add(d["target"])
+                hl_edges.add(d.get("id"))
+            elif d["target"] == nid:
+                hl_nodes.add(d["source"])
+                hl_edges.add(d.get("id"))
+
+    elif node_type == "topic" or nid.startswith("topic:"):
+        # 中心种子：显示全景
         return [_strip(el) for el in elements], {"node_id": None}
 
-    neighbors = {nid}
-    for el in elements:
-        if _is_edge(el):
-            d = el["data"]
+    else:
+        for e in edge_list:
+            d = e["data"]
             if d["source"] == nid:
-                neighbors.add(d["target"])
-            if d["target"] == nid:
-                neighbors.add(d["source"])
+                hl_nodes.add(d["target"])
+                hl_edges.add(d.get("id"))
+            elif d["target"] == nid:
+                hl_nodes.add(d["source"])
+                hl_edges.add(d.get("id"))
 
+    # 聚焦交互：聚焦子图赋予高光（highlighted），其余柔和退隐（faded），绝不退化成纯圆点
     out = []
     for el in elements:
-        base = _strip(el)
+        base = _strip_focus_classes(el)
         if _is_edge(el):
-            d = el["data"]
-            connected = d["source"] == nid or d["target"] == nid
+            eid = el["data"].get("id")
+            is_hl = eid in hl_edges or (el["data"]["source"] in hl_nodes and el["data"]["target"] in hl_nodes)
+            if is_hl:
+                base["classes"] = (base.get("classes", "") + " highlighted").strip()
+            else:
+                base["classes"] = (base.get("classes", "") + " faded").strip()
         else:
-            connected = el["data"].get("id") in neighbors
-        if not connected:
-            base["classes"] = (base.get("classes", "") + " faded").strip()
+            nid_el = el["data"].get("id")
+            if nid_el in hl_nodes:
+                base["classes"] = (base.get("classes", "") + " highlighted").strip()
+            else:
+                base["classes"] = (base.get("classes", "") + " faded").strip()
         out.append(base)
+
     return out, {"node_id": nid}
 
 
 @callback(
     Output("cytoscape-graph", "elements", allow_duplicate=True),
     Output("focus-store", "data", allow_duplicate=True),
+    Output("node-detail", "children", allow_duplicate=True),
     Input("btn-esc", "n_clicks"),
+    Input("btn-reset-focus", "n_clicks"),
+    Input("btn-unfocus-panel", "n_clicks"),
     State("cytoscape-graph", "elements"),
     State("focus-store", "data"),
     prevent_initial_call=True,
 )
-def _esc_unfocus(_n, elements, focus):
-    """ESC 退出聚焦（02_keyboard.js 把 Esc 转成隐藏按钮点击）：全部恢复高亮。"""
-    if not elements or not (focus or {}).get("node_id"):
-        return no_update, no_update
-    out = [{**el, "classes": el.get("classes", "").replace(" faded", "").strip()}
-           for el in elements]
-    return out, {"node_id": None}
+def _esc_unfocus(_n1, _n2, _n3, elements, focus):
+    """多通道退出聚焦：ESC 按键、画布全景重置按钮、右面板退出按钮、画布空白点击。"""
+    if not elements:
+        return no_update, no_update, no_update
+    out = [_strip_focus_classes(el) for el in elements]
+    default_hint = "点击树上任意节点查看论据与知乎真实引文"
+    return out, {"node_id": None}, default_hint
 
 
 # ── export JSON ──────────────────────────────────────────────────────────
@@ -1278,24 +1417,6 @@ def _export_json(n, bundle_data, sources_data, run_state):
     }
     return dcc.send_string(json.dumps(payload, ensure_ascii=False, indent=2), "epistree_graph.json")
 
-
-# ── helpers ──────────────────────────────────────────────────────────────
-
-def _build_source_list(sources: list[SearchItem]) -> html.Div:
-    if not sources:
-        return html.Div("暂无来源", className="annotation")
-
-    items = []
-    for s in sources:
-        items.append(html.Div([
-            html.A(s.author_name or s.title, href=str(s.url), target="_blank"),
-            html.Span(f" · {s.title[:80]}"),
-        ], style={"padding": "6px 0", "borderBottom": "1px solid rgba(255,255,255,.06)"}))
-
-    return html.Div([
-        html.H3(f"来源列表（{len(sources)} 条）", style={"marginTop": 0}),
-        *items,
-    ])
 
 
 def _build_quota_info(stats: dict) -> html.Div:

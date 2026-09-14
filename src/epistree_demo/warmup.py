@@ -51,10 +51,13 @@ def load_warmup_topics() -> dict[str, dict]:
     warmup_dir = Path(settings.data_dir)
     result: dict[str, dict] = {}
 
-    if not warmup_dir.exists():
-        return result
+    files = list(sorted(warmup_dir.glob("warmup_*.json"))) if warmup_dir.exists() else []
+    if not files:
+        fallback_dir = Path("./.data")
+        if fallback_dir.exists() and fallback_dir.resolve() != warmup_dir.resolve():
+            files = list(sorted(fallback_dir.glob("warmup_*.json")))
 
-    for fpath in sorted(warmup_dir.glob("warmup_*.json")):
+    for fpath in files:
         try:
             with open(fpath) as f:
                 data = json.load(f)

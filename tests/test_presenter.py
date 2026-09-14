@@ -92,3 +92,39 @@ class TestPresenter:
         assert len(dashed_edges) == 1
         assert dashed_edges[0]["data"]["edge_type"] == "contradicts"
         assert "rel-contradicts" in dashed_edges[0]["classes"].split()
+
+    def test_towering_tree_geometry(self):
+        bundle = GraphBundle(
+            topic="TreeTest",
+            questions=[
+                QuestionNode(id="q1", text="Q1", source_refs=[SourceRef(source_id="zhihu:answer:1")]),
+                QuestionNode(id="q2", text="Q2", source_refs=[SourceRef(source_id="zhihu:answer:2")]),
+            ],
+            claims=[
+                ClaimNode(id="c1", text="C1", question_id="q1", source_refs=[SourceRef(source_id="zhihu:answer:1")], confidence=0.9),
+                ClaimNode(id="c2", text="C2", question_id="q2", source_refs=[SourceRef(source_id="zhihu:answer:2")], confidence=0.85),
+            ],
+            events=[
+                EventNode(id="e1", text="E1", occurred_at="2020", source_refs=[SourceRef(source_id="zhihu:answer:1")], confidence=0.95),
+            ],
+            relations=[],
+        )
+        sources = [make_source("zhihu:answer:1"), make_source("zhihu:answer:2")]
+        nodes, edges = present(bundle, sources)
+        
+        by_type = {}
+        for n in nodes:
+            by_type.setdefault(n["data"]["node_type"], []).append(n)
+            assert "position" in n
+            assert "x" in n["position"] and "y" in n["position"]
+
+        # Roots (events) should have y > 0 (downwards)
+        for e_node in by_type["event"]:
+            assert e_node["position"]["y"] > 0, f"Event y should be positive (downward root), got {e_node['position']['y']}"
+
+        # Canopy (questions and claims) should have y < 0 (upward canopy)
+        for q_node in by_type["question"]:
+            assert q_node["position"]["y"] < 0, f"Question y should be negative (upward bough), got {q_node['position']['y']}"
+        for c_node in by_type["claim"]:
+            assert c_node["position"]["y"] < 0, f"Claim y should be negative (upward canopy), got {c_node['position']['y']}"
+

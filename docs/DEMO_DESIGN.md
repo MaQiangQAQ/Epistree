@@ -714,8 +714,8 @@ DEMO_ADMIN_TOKEN             # 只控制预热/强制刷新
 本地开发和验证时继续遵守项目现有约定：
 
 ```text
-ZHIHU_CLI_HOME=/Users/lvpeiye/Study/Project/20260901-知乎黑客松/.zhihu-cli
-/Users/lvpeiye/Study/Project/20260901-知乎黑客松/.zhihu-cli/current/zhihu-cli
+ZHIHU_CLI_HOME=$PROJECT_ROOT/.zhihu-cli
+$PROJECT_ROOT/.zhihu-cli/current/zhihu-cli
 ```
 
 CLI 仅用于人工调试和对照 HTTP 响应。Demo 服务自身按官方 HTTP 文档调用接口，不从 Web 进程 shell out 到 CLI。

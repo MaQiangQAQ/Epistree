@@ -73,10 +73,11 @@ def present(bundle: GraphBundle, sources: list[SearchItem]) -> tuple[list[dict],
     # Question nodes
     for q in bundle.questions:
         qid = _ensure_id(q.id, "question", node_ids)
+        q_label = q.text.split("：")[0][:18] if "：" in q.text else (q.text.split(":")[0][:18] if ":" in q.text else q.text[:18])
         nodes.append({
             "data": {
                 "id": qid,
-                "label": q.text[:30],
+                "label": q_label,
                 "node_type": "question",
                 "full_text": q.text,
                 "year": _refs_year(q.source_refs),
@@ -161,7 +162,7 @@ def present(bundle: GraphBundle, sources: list[SearchItem]) -> tuple[list[dict],
                 "label": "mentioned_in",
                 "edge_type": "contains",
             },
-            "classes": "solid trunk",
+            "classes": "solid root",
         })
 
     # Candidate relations (edges between claims)
@@ -239,95 +240,143 @@ _SEED = 20260909     # 固定种子：每次渲染树形一致
 
 
 def _assign_positions(nodes: list[dict], edges: list[dict]) -> None:
-    """Attach organic tree positions to every node, in place.
+    """Attach towering giant tree positions to every node, in place.
 
-    Topic 为树根（底部中央），Question 为主枝，Claim 为分枝，Event 挂在
-    树干低处，Source 为末梢小叶。分叉角按子树权重「中心外扩」分配（重者
-    继承主干方向），枝长按深度衰减并随年份差加长（纵向=时间）。
-    同时给每条树边写入 data.w（枝粗，达·芬奇 β=2.2 守恒）和弯曲方向
-    class（bend-left/right，stylesheet 转成 S 形贝塞尔）。
+    - Topic 为地表树基 (0, 0)。
+    - Event 为地底历史根系 (y > 0 向下 140° 扇形深扎，形成根深蒂固历史底蕴)。
+    - Trunk 为垂直拔地而起的核心主干 (y: 0 -> -850)。
+    - Question 主枝不再在原点扎堆，而是沿主干不同高度错落向左右两侧宽幅舒展 (140°~160° 宽幅树冠)。
+    - Claim 分枝沿各 Question 展开，形成二级次级枝桠。
+    - Source 叶片簇生于 Claim/Question 末梢，形成茂密繁盛的树冠绿叶。
+    - 达·芬奇枝粗守恒衰减 + S 形贝塞尔弯曲类名 + 模拟退火标签避让。
     """
     import math
     import random
 
     rng = random.Random(_SEED)
     by_id = {n["data"]["id"]: n for n in nodes}
-    years = [n["data"].get("year") for n in nodes if n["data"].get("year")]
-    y_min = min(years) if years else 0
+    edge_by_ends = {(e["data"]["source"], e["data"]["target"]): e for e in edges}
 
-    children: dict[str, list[str]] = {}
-    edge_of: dict[tuple[str, str], dict] = {}
-    attached_sources: set[str] = set()
+    # Locate Topic root
+    topic_node = next((n for n in nodes if n["data"]["node_type"] == "topic"), None)
+    topic_id = topic_node["data"]["id"] if topic_node else "topic:root"
+    if topic_node:
+        topic_node["position"] = {"x": 0.0, "y": 0.0}
+
+    # 1. 地底历史根系：Events 向下深入地底 (y > 0)
+    event_nodes = [n for n in nodes if n["data"]["node_type"] == "event"]
+    num_events = len(event_nodes)
+    for j, enode in enumerate(event_nodes):
+        t_root = j / max(1, num_events - 1)
+        # 向下扇形 (115° 到 245°，指向土壤地底)
+        root_angle = math.pi - 1.15 + t_root * 2.3 + rng.gauss(0, 0.03)
+        root_r = 160.0 + (j % 3) * 45.0 + rng.uniform(-10, 10)
+        rx = math.sin(root_angle) * root_r
+        ry = -math.cos(root_angle) * root_r  # cos < 0 => ry > 0 (地底下)
+        enode["position"] = {"x": round(rx, 1), "y": round(ry, 1)}
+        e = edge_by_ends.get((enode["data"]["id"], topic_id))
+        if e:
+            e["data"]["w"] = 4.8
+            bend = "bend-left" if rx < 0 else "bend-right"
+            e["classes"] = f"solid root {bend}"
+
+    # 2. 垂直粗壮主干与错落主枝：Questions 沿主干高度向左右大角度伸展 (y < 0)
+    question_nodes = [n for n in nodes if n["data"]["node_type"] == "question"]
+    num_q = len(question_nodes)
+    q_angles: dict[str, float] = {}
+
+    for k, qnode in enumerate(question_nodes):
+        t_trunk = (k + 0.5) / max(1, num_q)
+        # 沿主干垂直向上分布：从 y = -150 到 y = -820
+        y_attach = - (140.0 + t_trunk * 680.0)
+        x_attach = math.sin(t_trunk * math.pi * 1.2) * 26.0 + rng.uniform(-6, 6)
+
+        # 左右交替出枝
+        is_left = (k % 2 == 0)
+        if t_trunk < 0.38:
+            # 低位大主枝：几乎水平向两侧极度宽幅舒展 (72°~82°)，形成宽阔基座
+            ang = -1.30 if is_left else 1.30
+            b_len = 350.0 + rng.uniform(-15, 15)
+        elif t_trunk < 0.72:
+            # 中位主枝：斜向外上方舒展 (52°~62°)
+            ang = -0.98 if is_left else 0.98
+            b_len = 310.0 + rng.uniform(-15, 15)
+        else:
+            # 高位与树冠主枝：直冲高空拱卫树顶 (25°~35°)
+            ang = -0.48 if is_left else 0.48
+            b_len = 260.0 + rng.uniform(-15, 15)
+
+        qx = x_attach + math.sin(ang) * b_len
+        qy = y_attach - math.cos(ang) * b_len
+        qnode["position"] = {"x": round(qx, 1), "y": round(qy, 1)}
+        q_angles[qnode["data"]["id"]] = ang
+
+        e = edge_by_ends.get((qnode["data"]["id"], topic_id))
+        if e:
+            # 主枝粗度按达·芬奇递减 (底端 14px，顶端 8px)
+            e["data"]["w"] = round(max(7.5, 14.5 - t_trunk * 6.5), 2)
+            bend = "bend-left" if qx < 0 else "bend-right"
+            e["classes"] = f"solid trunk {bend}"
+
+    # 3. 观点分支：Claims 沿各 Question 主枝向外形成次级枝桠
+    claims_by_q: dict[str, list[dict]] = {}
+    for cnode in [n for n in nodes if n["data"]["node_type"] == "claim"]:
+        for qnode in question_nodes:
+            if (cnode["data"]["id"], qnode["data"]["id"]) in edge_by_ends:
+                claims_by_q.setdefault(qnode["data"]["id"], []).append(cnode)
+                break
+
+    c_angles: dict[str, float] = {}
+    for qid, c_list in claims_by_q.items():
+        q_pos = by_id[qid]["position"]
+        parent_ang = q_angles.get(qid, 0.0)
+        num_c = len(c_list)
+        c_spread = min(1.6, 0.42 * num_c)
+        for m, cnode in enumerate(c_list):
+            offset = 0.0 if num_c == 1 else (-c_spread / 2 + c_spread * m / (num_c - 1))
+            c_ang = parent_ang + offset + rng.gauss(0, 0.04)
+            c_len = 160.0 + (m % 2) * 28.0 + rng.uniform(-10, 10)
+            cx = q_pos["x"] + math.sin(c_ang) * c_len
+            cy = q_pos["y"] - math.cos(c_ang) * c_len
+            cnode["position"] = {"x": round(cx, 1), "y": round(cy, 1)}
+            c_angles[cnode["data"]["id"]] = c_ang
+            e = edge_by_ends.get((cnode["data"]["id"], qid))
+            if e:
+                e["data"]["w"] = 4.2
+                bend = "bend-left" if cx < q_pos["x"] else "bend-right"
+                e["classes"] = f"solid branch {bend}"
+
+    # 4. 树冠绿叶：Sources 簇生于 Claim / Question 外围
+    sources_by_target: dict[str, str] = {}
     for e in edges:
-        d = e["data"]
-        et = d.get("edge_type")
-        if et == "contains":
-            children.setdefault(d["target"], []).append(d["source"])
-            edge_of[(d["source"], d["target"])] = e
-        elif et == "evidence" and d["source"] not in attached_sources:
-            # Source 叶子只长在其首个引用节点上
-            attached_sources.add(d["source"])
-            children.setdefault(d["target"], []).append(d["source"])
-            edge_of[(d["source"], d["target"])] = e
+        if e["data"].get("edge_type") == "evidence":
+            src_id = e["data"]["source"]
+            tgt_id = e["data"]["target"]
+            if src_id not in sources_by_target:
+                sources_by_target[src_id] = tgt_id
 
-    def _weight(nid: str, _memo: dict[str, float] = {}) -> float:
-        if nid not in _memo:
-            base = {"source": 0.6, "event": 0.8}.get(by_id[nid]["data"]["node_type"], 1.0)
-            _memo[nid] = base + sum(_weight(c) for c in children.get(nid, []))
-        return _memo[nid]
+    target_to_sources: dict[str, list[str]] = {}
+    for sid, tid in sources_by_target.items():
+        target_to_sources.setdefault(tid, []).append(sid)
 
-    def _width(nid: str, _memo: dict[str, float] = {}) -> float:
-        if nid not in _memo:
-            kids = children.get(nid, [])
-            _memo[nid] = 1.6 if not kids else max(
-                1.6, sum(_width(c) ** 2.2 for c in kids) ** (1 / 2.2))
-        return _memo[nid]
+    for tid, s_list in target_to_sources.items():
+        t_pos = by_id[tid].get("position", {"x": 0.0, "y": 0.0})
+        num_s = len(s_list)
+        bias_ang = math.atan2(t_pos["y"], t_pos["x"]) if (t_pos["x"] != 0 or t_pos["y"] != 0) else -math.pi/2
+        s_spread = min(1.8, 0.35 * num_s)
+        for s_idx, sid in enumerate(s_list):
+            s_offset = 0.0 if num_s == 1 else (-s_spread / 2 + s_spread * s_idx / (num_s - 1))
+            leaf_ang = bias_ang + s_offset + rng.gauss(0, 0.05)
+            leaf_dist = 72.0 + (s_idx % 2) * 22.0 + rng.uniform(-8, 8)
+            sx = t_pos["x"] + math.cos(leaf_ang) * leaf_dist
+            sy = t_pos["y"] + math.sin(leaf_ang) * leaf_dist
+            by_id[sid]["position"] = {"x": round(sx, 1), "y": round(sy, 1)}
+            e = edge_by_ends.get((sid, tid))
+            if e:
+                e["data"]["w"] = 1.4
 
-    def _grow_children(nid: str, origin: tuple[float, float], angle: float,
-                       depth: int) -> None:
-        kids = children.get(nid, [])
-        if not kids:
-            return
-        n = len(kids)
-        spread = min(0.32 * n, 1.2) if depth == 0 else min(0.36 * n, 2.4)
-        offs = [0.0] if n == 1 else [
-            -spread / 2 + spread * i / (n - 1) for i in range(n)]
-        center_out = sorted(range(n), key=lambda i: (abs(offs[i]), i))
-        for rank, kid in enumerate(sorted(kids, key=lambda k: (-_weight(k), k))):
-            off = offs[center_out[rank]] + rng.gauss(0, 0.045)
-            kid_year = by_id[kid]["data"].get("year")
-            ln = (_TRUNK_LEN * (_DECAY ** depth)
-                  + ((kid_year - y_min) * _YEAR_LEN if kid_year else 30)
-                  + rng.uniform(-14, 14))
-            # 同层枝条径向交错长短，填满树冠避免挤在同一圆弧上
-            ln *= 1 + 0.18 * ((rank % 3) - 1)
-            ntype = by_id[kid]["data"]["node_type"]
-            if ntype == "source":
-                ln *= 0.38
-            elif ntype == "event":
-                ln *= 0.62
-            x = origin[0] + math.sin(angle + off) * ln
-            y = origin[1] - math.cos(angle + off) * ln  # 屏幕 y 向下，树向上长
-            by_id[kid]["position"] = {"x": x, "y": y}
-            e = edge_of.get((kid, nid))
-            if e is not None:
-                e["data"]["w"] = round(min(12.0, _width(kid) * 1.9), 2)
-                bend = "bend-left" if off < -0.02 else (
-                    "bend-right" if off > 0.02 else "bend-straight")
-                e["classes"] = (e.get("classes", "") + " " + bend).strip()
-            _grow_children(kid, (x, y), angle + off, depth + 1)
-
-    placed: set[str] = set()
-    for root in nodes:
-        if root["data"]["node_type"] == "topic":
-            root["position"] = {"x": 0.0, "y": 0.0}
-            placed.add(root["data"]["id"])
-            _grow_children(root["data"]["id"], (0.0, 0.0), 0.0, 0)
-            placed.update(_all_descendants(children, root["data"]["id"]))
-
-    # 碰撞消解：过近节点相互推开（主要推开，纵向轻推保持时间层次）
-    placed_nodes = [n for n in nodes
-                    if "position" in n and n["data"]["node_type"] != "topic"]
+    # 5. 碰撞消解：过近节点微调推开
+    placed_nodes = [n for n in nodes if "position" in n and n["data"]["node_type"] != "topic"]
     for _ in range(3):
         moved = False
         for i, a in enumerate(placed_nodes):
@@ -335,21 +384,23 @@ def _assign_positions(nodes: list[dict], edges: list[dict]) -> None:
                 dx = b["position"]["x"] - a["position"]["x"]
                 dy = b["position"]["y"] - a["position"]["y"]
                 dist = math.hypot(dx, dy)
-                if 0.1 < dist < 78:
-                    push = (78 - dist) / 2 * 0.7
+                min_dist = 68.0 if (a["data"]["node_type"] != "source" and b["data"]["node_type"] != "source") else 38.0
+                if 0.1 < dist < min_dist:
+                    push = (min_dist - dist) / 2 * 0.7
                     ux, uy = dx / dist, dy / dist
-                    a["position"]["x"] -= ux * push
-                    a["position"]["y"] -= uy * push * 0.4
-                    b["position"]["x"] += ux * push
-                    b["position"]["y"] += uy * push * 0.4
+                    a["position"]["x"] -= round(ux * push, 1)
+                    a["position"]["y"] -= round(uy * push * 0.4, 1)
+                    b["position"]["x"] += round(ux * push, 1)
+                    b["position"]["y"] += round(uy * push * 0.4, 1)
                     moved = True
         if not moved:
             break
 
-    # 未挂到树上的孤儿节点：排在树根下方，不参与分叉
+    # 兜底：未挂载节点排在侧边
+    placed = {n["data"]["id"] for n in nodes if "position" in n}
     orphans = [n for n in nodes if n["data"]["id"] not in placed]
     for i, n in enumerate(orphans):
-        n["position"] = {"x": (i - (len(orphans) - 1) / 2) * 130.0, "y": 180.0}
+        n["position"] = {"x": (i - (len(orphans) - 1) / 2) * 120.0, "y": 260.0}
 
     _assign_label_classes(nodes)
 
@@ -390,12 +441,12 @@ def _est_text_box(label: str, fs: float, wrap_w: float | None) -> tuple[float, f
 
 
 def _assign_label_classes(nodes: list[dict]) -> None:
-    """为每个节点选一个标签方位 class，最小化重叠。固定种子可复现。"""
+    """为每个常驻标签主枝（Question）选一个标签方位 class，最小化重叠与父枝遮挡。"""
     import math
     import random
 
     items = [n for n in nodes
-             if n["data"]["node_type"] in _LAB_FONT and "position" in n]
+             if n["data"]["node_type"] == "question" and "position" in n]
     if not items:
         return
 
@@ -434,42 +485,61 @@ def _assign_label_classes(nodes: list[dict]) -> None:
         oy = min(a[3], b[3]) - max(a[1], b[1])
         return ox * oy if ox > 0 and oy > 0 else 0.0
 
-    def _energy(assign: list[int]) -> float:
-        e = 0.0
-        boxes = [cand_boxes[i][c] for i, c in enumerate(assign)]
-        for i in range(len(boxes)):
-            e += _LAB_PREF[_LAB_CANDS[assign[i]]] * 20.0
-            for ob in obstacles:
-                if _overlap(boxes[i], ob) > 0:
-                    e += 30.0
-            for j in range(i + 1, len(boxes)):
-                e += _overlap(boxes[i], boxes[j]) * 0.5
-        return e
-
     n = len(items)
+    # Precompute single cost: preference + obstacle penalties
+    single_costs: list[list[float]] = []
+    for i in range(n):
+        row: list[float] = []
+        for c in range(len(_LAB_CANDS)):
+            box = cand_boxes[i][c]
+            cost = _LAB_PREF[_LAB_CANDS[c]] * 20.0
+            for ob in obstacles:
+                if _overlap(box, ob) > 0:
+                    cost += 30.0
+            row.append(cost)
+        single_costs.append(row)
+
     assign = [0] * n  # 初始全部 lab-r（Imhof 最优方位）
-    best, best_e = list(assign), _energy(assign)
+    cur_e = sum(single_costs[i][assign[i]] for i in range(n))
+    for i in range(n):
+        bi = cand_boxes[i][assign[i]]
+        for j in range(i + 1, n):
+            ov = _overlap(bi, cand_boxes[j][assign[j]])
+            if ov > 0:
+                cur_e += ov * 0.5
+
+    best, best_e = list(assign), cur_e
     rng = random.Random(_SEED + 1)
     temp = 50.0
-    cur_e = best_e
+
     for _ in range(1500):
         i = rng.randrange(n)
         old = assign[i]
         cand = rng.randrange(len(_LAB_CANDS))
         if cand == old:
             continue
-        assign[i] = cand
-        e = _energy(assign)
-        if e < cur_e or rng.random() < math.exp(-(e - cur_e) / max(temp, 1e-6)):
-            cur_e = e
-            if e < best_e:
-                best, best_e = list(assign), e
-        else:
-            assign[i] = old
+        old_box = cand_boxes[i][old]
+        new_box = cand_boxes[i][cand]
+
+        delta = single_costs[i][cand] - single_costs[i][old]
+        for j in range(n):
+            if j == i:
+                continue
+            bj = cand_boxes[j][assign[j]]
+            ov_new = _overlap(new_box, bj)
+            ov_old = _overlap(old_box, bj)
+            if ov_new != ov_old:
+                delta += (ov_new - ov_old) * 0.5
+
+        if delta < 0 or rng.random() < math.exp(-delta / max(temp, 1e-6)):
+            assign[i] = cand
+            cur_e += delta
+            if cur_e < best_e:
+                best, best_e = list(assign), cur_e
         temp *= 0.995
 
-    for n, c in zip(items, best):
-        n["classes"] = (n.get("classes", "") + " " + _LAB_CANDS[c]).strip()
+    for n_item, c in zip(items, best):
+        n_item["classes"] = (n_item.get("classes", "") + " " + _LAB_CANDS[c]).strip()
 
 
 
